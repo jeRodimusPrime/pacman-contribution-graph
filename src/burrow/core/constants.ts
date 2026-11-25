@@ -3,8 +3,8 @@ import { CELL_SIZE, DELTA_TIME, GAP_SIZE, GRID_HEIGHT, GRID_WIDTH } from '../../
 export { CELL_SIZE, DELTA_TIME, GAP_SIZE, GRID_HEIGHT, GRID_WIDTH };
 
 export const BURROW_HEADER_HEIGHT = 24;
-/** Blur radius (stdDeviation, px) that softens the soil into one continuous, blended field. */
-export const BURROW_SOIL_BLUR = 6;
+/** Blur (stdDeviation, px) used to round the soil into soft clods; small, so each day keeps its own colour. */
+export const BURROW_SOIL_CLUMP = 2;
 /** Corner radius of the soil field as a whole. */
 export const BURROW_FIELD_RADIUS = 8;
 export const BURROW_MIN_DURATION_MS = 5000;
@@ -22,17 +22,17 @@ export const BURROW_DEN: { x: number; y: number } = { x: -1, y: Math.floor(GRID_
 /** The wombat works on soil within this many columns of the leftmost soil left, sweeping left to right. */
 export const BURROW_SWEEP_WIDTH = 2;
 
-/** Lantern light carries this many cells down a straight, open tunnel. */
-export const BURROW_LANTERN_RANGE = 3;
-/** Each flash of the lantern is held up for this many frames, glow pulsing, so the lullaby reads clearly. */
-export const BURROW_LANTERN_HOLD_FRAMES = 4;
-/** Frames between lowering the lantern and raising it again. */
-export const BURROW_LANTERN_COOLDOWN = 2;
-/** Lantern hits needed to put a beetle to sleep. */
+/** The wombat's humming carries this many cells down a straight, open tunnel. */
+export const BURROW_HUM_RANGE = 3;
+/** Each note of the lullaby takes this many frames to float from the wombat to the beetle. */
+export const BURROW_HUM_FRAMES = 4;
+/** Frames between one note landing and the next being hummed. */
+export const BURROW_HUM_COOLDOWN = 2;
+/** Notes needed to put a beetle to sleep. */
 export const BURROW_LULL_HITS = 3;
-/** A lit beetle stays frozen until just after the next flash could land, so it cannot slip away mid-lullaby. */
-export const BURROW_FREEZE_FRAMES = BURROW_LANTERN_HOLD_FRAMES + BURROW_LANTERN_COOLDOWN + 2;
-/** Drowsiness wears off by one level after this many frames without light. */
+/** A beetle being sung to stays put until just after the next note could land, so it cannot slip away mid-lullaby. */
+export const BURROW_FREEZE_FRAMES = BURROW_HUM_FRAMES + BURROW_HUM_COOLDOWN + 2;
+/** Drowsiness wears off by one level after this many frames without another note. */
 export const BURROW_WAKE_FRAMES = 15;
 /** Frames a sleeping or dizzy beetle lingers before heading home. */
 export const BURROW_NAP_FRAMES = 12;

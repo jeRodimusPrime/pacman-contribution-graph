@@ -13,9 +13,9 @@ import {
 	BURROW_DEN,
 	BURROW_END_HOLD_FRAMES,
 	BURROW_FREEZE_FRAMES,
-	BURROW_LANTERN_COOLDOWN,
-	BURROW_LANTERN_HOLD_FRAMES,
-	BURROW_LANTERN_RANGE,
+	BURROW_HUM_COOLDOWN,
+	BURROW_HUM_FRAMES,
+	BURROW_HUM_RANGE,
 	BURROW_LEVEL_POINTS,
 	BURROW_LULL_HITS,
 	BURROW_LULL_POINTS,
@@ -138,7 +138,7 @@ const placeBeetles = (store: BurrowStore, random: Random): Beetle[] => {
 			facing: 'left',
 			drowsiness: 0,
 			frozenFor: 0,
-			lastLitFrame: 0,
+			lastHummedFrame: 0,
 			moveCooldown: 0,
 			stuckFrames: 0,
 			timer: 0,
@@ -168,9 +168,9 @@ const resetGameState = (store: BurrowStore): Random => {
 		facing: 'right',
 		pose: 'walk',
 		digPhase: 0,
-		lanternCooldown: 0,
-		lanternHold: 0,
-		lanternAim: 'side',
+		humCooldown: 0,
+		humHold: 0,
+		humTarget: null,
 		visible: true
 	};
 
@@ -197,10 +197,10 @@ const addScore = (store: BurrowStore, points: number) => {
 /* ───────────────────────── Wombat ───────────────────────── */
 
 /**
- * The first awake beetle the lantern can reach: in a straight line, at most BURROW_LANTERN_RANGE cells away,
- * with only open tunnel in between. Light does not pass through soil, except right up close.
+ * The first awake beetle the wombat's humming can reach: in a straight line, at most BURROW_HUM_RANGE cells away,
+ * with only open tunnel in between. The tune does not carry through soil, except right up close.
  */
-export const findLanternTarget = (store: BurrowStore): Beetle | null => {
+export const findHumTarget = (store: BurrowStore): Beetle | null => {
 	const { wombat } = store;
 	for (const { x: dx, y: dy } of [
 		{ x: wombat.facing === 'right' ? 1 : -1, y: 0 },
@@ -208,7 +208,7 @@ export const findLanternTarget = (store: BurrowStore): Beetle | null => {
 		{ x: 0, y: -1 },
 		{ x: 0, y: 1 }
 	]) {
-		for (let distance = 1; distance <= BURROW_LANTERN_RANGE; distance++) {
+		for (let distance = 1; distance <= BURROW_HUM_RANGE; distance++) {
 			const p = { x: wombat.x + dx * distance, y: wombat.y + dy * distance };
 			if (!inBounds(p) || pebbleAt(store, p)) break;
 			const beetle = beetleAt(store, p);
@@ -222,19 +222,26 @@ export const findLanternTarget = (store: BurrowStore): Beetle | null => {
 	return null;
 };
 
-const raiseLantern = (store: BurrowStore, beetle: Beetle, frame: number) => {
+/** The wombat closes its eyes and hums; a note sets off towards the beetle, which stops to listen. */
+const startHumming = (store: BurrowStore, beetle: Beetle) => {
 	const { wombat } = store;
-	wombat.pose = 'lantern';
+	wombat.pose = 'hum';
 	wombat.facing = facingTowards(wombat, beetle, wombat.facing);
-	wombat.lanternAim = beetle.y < wombat.y ? 'up' : beetle.y > wombat.y ? 'down' : 'side';
 	wombat.digPhase = 0;
-	// The flash frame counts as the first held frame; the cooldown starts once the lantern comes down.
-	wombat.lanternHold = BURROW_LANTERN_HOLD_FRAMES - 1;
-	wombat.lanternCooldown = BURROW_LANTERN_COOLDOWN + 1;
+	wombat.humTarget = beetle.id;
+	wombat.humHold = BURROW_HUM_FRAMES - 1;
+	// The cooldown only starts counting once the note has landed.
+	wombat.humCooldown = BURROW_HUM_COOLDOWN + 1;
+	beetle.frozenFor = BURROW_FREEZE_FRAMES;
+};
 
+/** The note reaches the beetle, which gets a little sleepier. */
+const landNote = (store: BurrowStore, frame: number) => {
+	const beetle = store.beetles.find((b) => b.id === store.wombat.humTarget);
+	if (!beetle || beetle.state !== 'awake') return;
 	beetle.drowsiness++;
 	beetle.frozenFor = BURROW_FREEZE_FRAMES;
-	beetle.lastLitFrame = frame;
+	beetle.lastHummedFrame = frame;
 	if (beetle.drowsiness >= BURROW_LULL_HITS) {
 		beetle.state = 'asleep';
 		beetle.timer = BURROW_NAP_FRAMES;
@@ -291,23 +298,25 @@ export const planWombatPath = (store: BurrowStore): Position[] | null => {
 	);
 };
 
-/** Returns true when the wombat dug or lulled something this frame. */
+/** Returns true when the wombat dug or sang this frame. */
 const moveWombat = (store: BurrowStore, frame: number): boolean => {
 	const { wombat } = store;
-	if (wombat.lanternHold > 0) {
-		wombat.lanternHold--;
+	if (wombat.humHold > 0) {
+		wombat.humHold--;
 		wombat.digPhase = 1 - wombat.digPhase;
+		if (wombat.humHold === 0) landNote(store, frame);
 		return true;
 	}
-	wombat.lanternCooldown = Math.max(0, wombat.lanternCooldown - 1);
+	wombat.humCooldown = Math.max(0, wombat.humCooldown - 1);
 	wombat.pose = 'walk';
+	wombat.humTarget = null;
 
-	const beetle = findLanternTarget(store);
-	if (beetle && wombat.lanternCooldown === 0) {
-		raiseLantern(store, beetle, frame);
+	const beetle = findHumTarget(store);
+	if (beetle && wombat.humCooldown === 0) {
+		startHumming(store, beetle);
 		return true;
 	}
-	// Mid-lullaby: wait for the lantern to be ready again rather than wandering out of reach.
+	// Mid-lullaby: wait for the next note rather than wandering out of earshot.
 	if (beetle && beetle.drowsiness > 0) {
 		wombat.facing = facingTowards(wombat, beetle, wombat.facing);
 		return true;
@@ -419,9 +428,9 @@ const updateBeetles = (store: BurrowStore, frame: number, random: Random) => {
 		}
 		if (beetle.state !== 'awake') continue;
 
-		if (beetle.drowsiness > 0 && frame - beetle.lastLitFrame >= BURROW_WAKE_FRAMES) {
+		if (beetle.drowsiness > 0 && frame - beetle.lastHummedFrame >= BURROW_WAKE_FRAMES) {
 			beetle.drowsiness--;
-			beetle.lastLitFrame = frame;
+			beetle.lastHummedFrame = frame;
 		}
 		if (beetle.frozenFor > 0) {
 			beetle.frozenFor--;
@@ -462,9 +471,9 @@ const playEnding = (store: BurrowStore) => {
 		facing: 'right',
 		pose: 'walk',
 		digPhase: 0,
-		lanternCooldown: 0,
-		lanternHold: 0,
-		lanternAim: 'side'
+		humCooldown: 0,
+		humHold: 0,
+		humTarget: null
 	});
 	for (const beetle of store.beetles) Object.assign(beetle, { ...beetle.spawn, state: 'hidden', facing: 'left', drowsiness: 0 });
 	for (const pebble of store.pebbles) Object.assign(pebble, { ...pebble.spawn, timer: 0 });

@@ -10,29 +10,29 @@ export type Facing = 'left' | 'right';
 /**
  * - `walk`: trundling along a tunnel (or standing still)
  * - `dig`: scraping at the soil in front of it
- * - `lantern`: holding up its lantern to lull a beetle
+ * - `hum`: humming a lullaby at a beetle, eyes closed
  * - `sleep`: curled up for a nap once the burrow is finished
  */
-export type WombatPose = 'walk' | 'dig' | 'lantern' | 'sleep';
+export type WombatPose = 'walk' | 'dig' | 'hum' | 'sleep';
 
 export interface Wombat extends Position {
 	facing: Facing;
 	pose: WombatPose;
-	/** Alternates every dig or lantern frame, so the claws scrabble and the lantern glow pulses. */
+	/** Alternates every dig or hum frame, so the claws scrabble and the notes bob. */
 	digPhase: number;
-	/** Frames until the lantern can be raised again. */
-	lanternCooldown: number;
-	/** Frames the lantern stays raised for the current flash. */
-	lanternHold: number;
-	/** Which way the lantern light points while the pose is `lantern`. */
-	lanternAim: 'side' | 'up' | 'down';
+	/** Frames until the wombat can hum the next note. */
+	humCooldown: number;
+	/** Frames left before the current note reaches the beetle (counts down to 0, when it lands). */
+	humHold: number;
+	/** Id of the beetle being sung to, while humming. */
+	humTarget: number | null;
 	visible: boolean;
 }
 
 /**
  * - `hidden`: not peeked out yet
  * - `awake`: wandering the tunnels (or squeezing through soil) towards the wombat
- * - `asleep`: lulled by the lantern; dozes for a moment, then heads home
+ * - `asleep`: sung to sleep; dozes for a moment, then heads home
  * - `dizzy`: bonked by a falling pebble; wobbles for a moment, then heads home
  * - `gone`: went home
  */
@@ -46,8 +46,8 @@ export interface Beetle extends Position {
 	drowsiness: number;
 	/** Frames the beetle stays frozen in place after being lit. */
 	frozenFor: number;
-	/** Frame of the last lantern hit; drowsiness wears off if it is not topped up. */
-	lastLitFrame: number;
+	/** Frame the last note landed; drowsiness wears off if it is not topped up. */
+	lastHummedFrame: number;
 	/** Frames until the next step. */
 	moveCooldown: number;
 	/** Frames spent without a tunnel route to the wombat; once it runs out the beetle squeezes through soil. */

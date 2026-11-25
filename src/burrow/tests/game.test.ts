@@ -7,18 +7,17 @@ import {
 	BURROW_BONK_POINTS,
 	BURROW_DEN,
 	BURROW_END_HOLD_FRAMES,
-	BURROW_LANTERN_COOLDOWN,
-	BURROW_LANTERN_HOLD_FRAMES,
-	BURROW_LANTERN_RANGE,
+	BURROW_HUM_COOLDOWN,
+	BURROW_HUM_FRAMES,
+	BURROW_HUM_RANGE,
 	BURROW_LULL_HITS,
 	BURROW_LULL_POINTS,
 	BURROW_NAP_END_FRAMES,
 	BURROW_REGROW_FRAMES
 } from '../core/constants';
-import { findLanternTarget, planWombatPath, simulate } from '../core/game';
+import { findHumTarget, planWombatPath, simulate } from '../core/game';
 import { Store } from '../core/store';
-import { crumbleStage } from '../renderers/sprites';
-import { Renderer } from '../renderers/svg';
+import { crumbleStage, Renderer } from '../renderers/svg';
 import { Beetle, BurrowSnapshot, BurrowStore } from '../types';
 
 const LEVELS: ContributionLevel[] = ['NONE', 'FIRST_QUARTILE', 'SECOND_QUARTILE', 'THIRD_QUARTILE', 'FOURTH_QUARTILE'];
@@ -152,7 +151,7 @@ describe('burrow rules', () => {
 		}
 	});
 
-	it(`takes ${BURROW_LULL_HITS} lantern hits to put a beetle to sleep`, () => {
+	it(`takes ${BURROW_LULL_HITS} notes to sing a beetle to sleep`, () => {
 		const store = createScenarioStore('random');
 		simulate(store);
 
@@ -164,7 +163,7 @@ describe('burrow rules', () => {
 		}
 	});
 
-	it('sings a slow lullaby: each flash is held, and the wombat waits between flashes', () => {
+	it('sings a slow lullaby: each note floats over, and the wombat waits between notes', () => {
 		const store = createScenarioStore('gradient');
 		simulate(store);
 
@@ -177,11 +176,13 @@ describe('burrow rules', () => {
 		const lastLull = hits.slice(-BURROW_LULL_HITS);
 		expect(lastLull).toHaveLength(BURROW_LULL_HITS);
 		for (let k = 1; k < lastLull.length; k++) {
-			expect(lastLull[k] - lastLull[k - 1]).toBe(BURROW_LANTERN_HOLD_FRAMES + BURROW_LANTERN_COOLDOWN);
+			expect(lastLull[k] - lastLull[k - 1]).toBe(BURROW_HUM_FRAMES + BURROW_HUM_COOLDOWN);
 		}
+		// The wombat hums for the whole time each note is in the air, and the beetle only reacts once it lands.
 		for (const hit of lastLull) {
-			const poses = store.snapshots.slice(hit, hit + BURROW_LANTERN_HOLD_FRAMES).map((s) => s.wombat.pose);
-			expect(poses.every((pose) => pose === 'lantern')).toBe(true);
+			const humming = store.snapshots.slice(hit - BURROW_HUM_FRAMES + 1, hit + 1);
+			expect(humming.every((s) => s.wombat.pose === 'hum' && s.wombat.humTarget === lulled.id)).toBe(true);
+			expect(store.snapshots[hit - 1].beetles[lulled.id].drowsiness).toBeLessThan(store.snapshots[hit].beetles[lulled.id].drowsiness);
 		}
 	});
 
@@ -212,8 +213,8 @@ describe('burrow rules', () => {
 		expect(path && path[path.length - 1].x).not.toBe(10);
 	});
 
-	describe('lantern', () => {
-		const lanternStore = (beetleX: number, soilBetween = false) => {
+	describe('humming', () => {
+		const humStore = (beetleX: number, soilBetween = false) => {
 			const store = createStoreWithLevels(soilBetween ? [{ x: 2, y: 3, level: 1 }] : []);
 			simulate(store); // initialise the board
 			store.soil = store.soil.map((column) => column.map(() => 0));
@@ -225,19 +226,19 @@ describe('burrow rules', () => {
 			return { store, beetle };
 		};
 
-		it(`reaches a beetle up to ${BURROW_LANTERN_RANGE} cells down an open tunnel`, () => {
-			const { store, beetle } = lanternStore(BURROW_LANTERN_RANGE);
-			expect(findLanternTarget(store)).toBe(beetle);
+		it(`reaches a beetle up to ${BURROW_HUM_RANGE} cells down an open tunnel`, () => {
+			const { store, beetle } = humStore(BURROW_HUM_RANGE);
+			expect(findHumTarget(store)).toBe(beetle);
 		});
 
 		it('does not reach any further', () => {
-			const { store } = lanternStore(BURROW_LANTERN_RANGE + 1);
-			expect(findLanternTarget(store)).toBeNull();
+			const { store } = humStore(BURROW_HUM_RANGE + 1);
+			expect(findHumTarget(store)).toBeNull();
 		});
 
-		it('does not shine through soil', () => {
-			const { store } = lanternStore(3, true);
-			expect(findLanternTarget(store)).toBeNull();
+		it('does not carry through soil', () => {
+			const { store } = humStore(3, true);
+			expect(findHumTarget(store)).toBeNull();
 		});
 	});
 });
@@ -293,7 +294,7 @@ describe('burrow svg', () => {
 		const svg = Renderer.generateAnimatedSVG(store);
 
 		const defined = new Set([...svg.matchAll(/<g id="([^"]+)"/g)].map((m) => m[1]));
-		const referenced = new Set([...svg.matchAll(/#(b[wbp]-[a-z0-9-]+)/g)].map((m) => m[1]));
+		const referenced = new Set([...svg.matchAll(/#(b[wbpn]-[a-z0-9-]+)/g)].map((m) => m[1]));
 		for (const id of referenced) expect(defined).toContain(id);
 	});
 
@@ -304,43 +305,43 @@ describe('burrow svg', () => {
 		expect([1, 0].map((h) => crumbleStage(1, h))).toEqual([0, 0]);
 	});
 
-	it('crumbles a dense day through every stage while it is dug', () => {
+	it('shrinks a dense day step by step while it is dug', () => {
 		const store = createStoreWithLevels([{ x: 0, y: BURROW_DEN.y, level: 4 }]);
 		simulate(store);
 		const svg = Renderer.generateAnimatedSVG(store);
 
-		const crumbleHref = svg.match(/<use href="#bc-1"[^>]*><animate attributeName="href"[^>]*values="([^"]+)"/);
-		expect(crumbleHref).not.toBeNull();
-		const stages = (crumbleHref as RegExpMatchArray)[1].split(';').filter((v, i, all) => v !== all[i - 1]);
-		expect(stages).toEqual(['#bc-1', '#bc-2', '#bc-3']);
-		expect(svg).toContain('<clipPath id="bc-clip">');
+		// Shrinks with each scrape, stays small once dug (it is transparent by then), and is full size again after the regrow.
+		expect(svg).toMatch(/type="scale"[^>]*values="1;0\.8;0\.62;0\.45;1"/);
 	});
 
-	it('opens light days in a single scrape, without crumbling', () => {
+	it('opens light days in a single scrape, without shrinking', () => {
 		const store = createStoreWithLevels([{ x: 0, y: BURROW_DEN.y, level: 1 }]);
 		simulate(store);
-		expect(Renderer.generateAnimatedSVG(store)).not.toContain('#bc-');
+		expect(Renderer.generateAnimatedSVG(store)).not.toContain('type="scale"');
 	});
 
-	it('draws the soil as one continuous, blended field', () => {
+	it('carves tunnels out of one continuous, textured layer of soil', () => {
 		const store = createScenarioStore('random');
 		simulate(store);
 		const svg = Renderer.generateAnimatedSVG(store);
 
 		expect(svg).toContain('<filter id="burrow-soil"');
-		expect(svg).toContain('<g filter="url(#burrow-soil)" clip-path="url(#burrow-field)">');
-		expect(svg).toContain(`<rect x="22" y="${24 + 22}" width="22" height="22" fill=`);
+		expect(svg).toContain('<feTurbulence');
+		expect(svg).toContain('<feOffset in="shadowSoft"');
+		expect(svg).toContain('<g filter="url(#burrow-soil)">');
+		// Cells are drawn edge to edge, centred on their slot.
+		expect(svg).toContain('<rect x="-11" y="-11" width="22" height="22"');
+		// Days that are never soil are not drawn at all: the tunnel floor shows through.
+		expect(svg.match(/<rect x="-11"/g)?.length).toBe(store.initialSoil.flat().filter((h) => h > 0).length);
 	});
 
-	it('draws the lantern glow behind the beetles', () => {
+	it('floats the lullaby notes above the beetles', () => {
 		const store = createScenarioStore('gradient');
 		simulate(store);
 		const svg = Renderer.generateAnimatedSVG(store);
 
-		const glow = svg.search(/<use href="#bg-/);
-		const firstBeetle = svg.search(/<use href="#bb-/);
-		expect(glow).toBeGreaterThan(0);
-		expect(glow).toBeLessThan(firstBeetle);
+		const notes = svg.search(/<use href="#bn-/);
+		expect(notes).toBeGreaterThan(svg.search(/<use href="#bb-/));
 	});
 
 	it('uses warm tunnels and the theme palette for soil', () => {

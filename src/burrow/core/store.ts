@@ -15,9 +15,9 @@ export const Store: BurrowStore = {
 		facing: 'right',
 		pose: 'walk',
 		digPhase: 0,
-		lanternCooldown: 0,
-		lanternHold: 0,
-		lanternAim: 'side',
+		humCooldown: 0,
+		humHold: 0,
+		humTarget: null,
 		visible: true
 	},
 	beetles: [],

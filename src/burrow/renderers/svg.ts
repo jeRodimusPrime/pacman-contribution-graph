@@ -1,11 +1,12 @@
 import { AnimationData } from '../../shared/types';
 import { Utils } from '../../shared/utils/utils';
 import {
-	BURROW_FIELD_RADIUS,
 	BURROW_DURATION_DIVISOR,
+	BURROW_FIELD_RADIUS,
 	BURROW_HEADER_HEIGHT,
+	BURROW_HUM_FRAMES,
 	BURROW_MIN_DURATION_MS,
-	BURROW_SOIL_BLUR,
+	BURROW_SOIL_CLUMP,
 	CELL_SIZE,
 	DELTA_TIME,
 	GAP_SIZE,
@@ -13,59 +14,85 @@ import {
 	GRID_WIDTH
 } from '../core/constants';
 import { BurrowSnapshot, BurrowStore, Position } from '../types';
-import { beetleRef, buildSpriteDefs, crumbleRef, crumbleStage, getBurrowPalette, lanternGlowRef, pebbleRef, wombatRef } from './sprites';
+import { beetleRef, buildSpriteDefs, getBurrowPalette, noteRef, pebbleRef, wombatRef } from './sprites';
 
 const PITCH = CELL_SIZE + GAP_SIZE;
 const FIELD_TOP = BURROW_HEADER_HEIGHT;
 const FIELD_HEIGHT = GRID_HEIGHT * PITCH;
 
 /**
- * The soil is drawn as one continuous field: neighbouring days blur into each other like layers of earth.
- * The blur would fade the field's outer edge into the background, so alpha is forced back to fully opaque
- * (feComponentTransfer works on un-premultiplied colour, so edge colours come out true, not darkened).
+ * The soil is one continuous layer of earth with open tunnels carved through it:
+ * - a small blur followed by an alpha threshold rounds the soil into soft clods, so neighbouring days run
+ *   together and dug-out tunnels get rounded walls, while each day keeps its own colour;
+ * - fine grain gives both the soil and the tunnel floor some texture;
+ * - the soil casts a short shadow down into the tunnels and catches a little light on its top edges,
+ *   so the tunnels read as carved out of it rather than painted on.
  */
 const buildSoilDefs = (width: number) =>
 	`<filter id="burrow-soil" filterUnits="userSpaceOnUse" x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" color-interpolation-filters="sRGB">` +
-	`<feGaussianBlur stdDeviation="${BURROW_SOIL_BLUR}" edgeMode="duplicate"/>` +
-	`<feComponentTransfer><feFuncA type="table" tableValues="1 1"/></feComponentTransfer>` +
+	`<feGaussianBlur in="SourceGraphic" stdDeviation="${BURROW_SOIL_CLUMP}" result="soft"/>` +
+	`<feColorMatrix in="soft" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 18 -8" result="clump"/>` +
+	`<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>` +
+	`<feColorMatrix in="noise" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 0 0 0 -0.74" result="specks"/>` +
+	`<feComposite in="specks" in2="clump" operator="in" result="soilGrain"/>` +
+	`<feComposite in="specks" in2="clump" operator="out" result="looseFloorGrain"/>` +
+	`<feComponentTransfer in="looseFloorGrain" result="floorGrain"><feFuncA type="linear" slope="0.3"/></feComponentTransfer>` +
+	`<feGaussianBlur in="clump" stdDeviation="1.2" result="shadowSoft"/>` +
+	`<feOffset in="shadowSoft" dy="2.2" result="shadowDrop"/>` +
+	`<feFlood flood-color="#000000" flood-opacity="0.3"/>` +
+	`<feComposite in2="shadowDrop" operator="in" result="shadow"/>` +
+	`<feOffset in="clump" dy="1.4" result="clumpDown"/>` +
+	`<feComposite in="clump" in2="clumpDown" operator="out" result="topEdge"/>` +
+	`<feFlood flood-color="#ffffff" flood-opacity="0.22"/>` +
+	`<feComposite in2="topEdge" operator="in" result="rim"/>` +
+	`<feMerge><feMergeNode in="floorGrain"/><feMergeNode in="shadow"/><feMergeNode in="clump"/><feMergeNode in="soilGrain"/><feMergeNode in="rim"/></feMerge>` +
 	`</filter>` +
 	`<clipPath id="burrow-field"><rect x="0" y="${FIELD_TOP}" width="${width - GAP_SIZE}" height="${FIELD_HEIGHT - GAP_SIZE}" rx="${BURROW_FIELD_RADIUS}"/></clipPath>`;
 
+/** Number of steps a cell shrinks through while it is being dug. */
+export const CRUMBLE_STAGES = 3;
+/** Size of a half-dug cell at each crumble stage (index = stage). */
+const CRUMBLE_SCALES = ['1', '0.8', '0.62', '0.45'];
+
+/**
+ * Crumble stage (1…CRUMBLE_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
+ * cell is untouched or fully dug. A level-4 day goes through every stage; a level-1 day opens in one scrape.
+ */
+export const crumbleStage = (initial: number, remaining: number) =>
+	remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * CRUMBLE_STAGES - 1e-9);
+
 const toX = (x: number) => x * (CELL_SIZE + GAP_SIZE);
 const toY = (y: number) => y * (CELL_SIZE + GAP_SIZE) + BURROW_HEADER_HEIGHT;
-const centerOf = ({ x, y }: Position) => `${toX(x) + CELL_SIZE / 2} ${toY(y) + CELL_SIZE / 2}`;
+const centerX = (x: number) => toX(x) + CELL_SIZE / 2;
+const centerY = (y: number) => toY(y) + CELL_SIZE / 2;
+const centerOf = ({ x, y }: Position) => `${centerX(x)} ${centerY(y)}`;
 
 export const SVG_KEY_TIMES_PRECISION = 4;
 
 const toKeyTime = (index: number, totalFrames: number) => Number((index / (totalFrames - 1)).toFixed(SVG_KEY_TIMES_PRECISION));
 
-/** Discrete animation that only lists the frames where the value changes. */
+/**
+ * Discrete animation that only lists the frames where the value changes. A discrete animation holds each
+ * value until the next keyframe, so no hold keyframes or closing keyframe at 1 are needed.
+ */
 const generateChangingValuesAnimation = (changingValues: string[]): AnimationData | null => {
 	const totalFrames = changingValues.length;
 	if (totalFrames <= 1) return null;
 
 	const keyTimes: number[] = [];
 	const values: string[] = [];
-	let lastValue: string | null = null;
-	let lastIndex: number | null = null;
-
-	changingValues.forEach((currentValue, index) => {
-		if (currentValue === lastValue) return;
-		if (lastValue !== null && lastIndex !== null && index - 1 !== lastIndex) {
-			keyTimes.push(Number(((index - 0.1) / (totalFrames - 1)).toFixed(SVG_KEY_TIMES_PRECISION)));
-			values.push(lastValue);
+	changingValues.forEach((value, index) => {
+		if (value === values[values.length - 1]) return;
+		const time = toKeyTime(index, totalFrames);
+		// Two changes that round to the same key time: the later one wins.
+		if (time === keyTimes[keyTimes.length - 1]) values[values.length - 1] = value;
+		else {
+			keyTimes.push(time);
+			values.push(value);
 		}
-		keyTimes.push(toKeyTime(index, totalFrames));
-		values.push(currentValue);
-		lastValue = currentValue;
-		lastIndex = index;
 	});
 
 	if (values.length <= 1) return null;
-	if (keyTimes[keyTimes.length - 1] !== 1) {
-		keyTimes.push(1);
-		values.push(lastValue ?? changingValues[totalFrames - 1]);
-	}
 	return { keyTimes: keyTimes.join(';'), values: values.join(';') };
 };
 
@@ -139,59 +166,29 @@ const buildMonthLabels = (store: BurrowStore) => {
 	return labels;
 };
 
-/** At most this many half-dug cells crumble at once; the wombat digs one at a time, so one spare is plenty. */
-const CRUMBLE_SLOTS = 2;
-
-interface CrumbleFrame {
-	position: Position;
-	stage: number;
-}
+/** How high above the ground a note floats on its way to the beetle. */
+const NOTE_LIFT = 8;
 
 /**
- * Crumble overlays for every frame, one timeline per slot. A cell keeps the same slot for as long as it is
- * half-dug, so its overlay never jumps between slots mid-crumble.
+ * While the wombat hums, a note floats from it to the beetle it is singing to, bobbing as it goes, and
+ * lands on the frame the beetle gets sleepier.
  */
-const buildCrumbleTimelines = (store: BurrowStore): SpriteTimeline[] => {
-	const slots: (CrumbleFrame | null)[][] = Array.from({ length: CRUMBLE_SLOTS }, () => []);
-	let assigned: (string | null)[] = Array(CRUMBLE_SLOTS).fill(null);
-
-	for (const snapshot of store.snapshots) {
-		const crumbling = new Map<string, CrumbleFrame>();
-		for (let x = 0; x < GRID_WIDTH; x++) {
-			for (let y = 0; y < GRID_HEIGHT; y++) {
-				const stage = crumbleStage(store.initialSoil[x]?.[y] ?? 0, snapshot.soil[x][y]);
-				if (stage > 0) crumbling.set(`${x}:${y}`, { position: { x, y }, stage });
-			}
-		}
-		assigned = assigned.map((key) => (key !== null && crumbling.has(key) ? key : null));
-		for (const key of crumbling.keys()) {
-			if (assigned.includes(key)) continue;
-			const free = assigned.indexOf(null);
-			if (free >= 0) assigned[free] = key;
-		}
-		assigned.forEach((key, slot) => slots[slot].push(key === null ? null : (crumbling.get(key) as CrumbleFrame)));
-	}
-
-	return slots.map((frames) => {
-		// An idle slot stays where it last was (hidden) so it never slides across the board.
-		let last: CrumbleFrame = frames.find((f) => f !== null) ?? { position: { x: 0, y: 0 }, stage: 1 };
-		const filled = frames.map((f) => (f ? (last = f) : last));
-		return {
-			positions: filled.map((f) => centerOf(f.position)),
-			refs: filled.map((f) => crumbleRef(f.stage)),
-			opacities: frames.map((f) => (f ? '1' : '0'))
-		};
+const buildNoteTimeline = (store: BurrowStore): SpriteTimeline => {
+	const frames = store.snapshots.map((s) => {
+		const { wombat } = s;
+		const beetle = s.beetles.find((b) => b.id === wombat.humTarget);
+		if (wombat.pose !== 'hum' || !beetle) return null;
+		const progress = (BURROW_HUM_FRAMES - wombat.humHold) / BURROW_HUM_FRAMES;
+		const x = centerX(wombat.x) + (centerX(beetle.x) - centerX(wombat.x)) * progress;
+		const y = centerY(wombat.y) + (centerY(beetle.y) - centerY(wombat.y)) * progress - NOTE_LIFT - (wombat.humHold % 2) * 2;
+		return { position: `${Math.round(x * 10) / 10} ${Math.round(y * 10) / 10}`, ref: noteRef(wombat.humHold) };
 	});
-};
-
-/** The lantern glow follows the wombat and only shows while the lantern is up. */
-const buildLanternGlowTimeline = (store: BurrowStore): SpriteTimeline => {
-	const refs = store.snapshots.map((s) => lanternGlowRef(s.wombat));
-	let last = refs.find((r) => r !== null) ?? '#bg-side-r';
+	let last = frames.find((f) => f !== null) ?? { position: '0 0', ref: noteRef(0) };
+	const filled = frames.map((f) => (f ? (last = f) : last));
 	return {
-		positions: store.snapshots.map((s) => centerOf(s.wombat)),
-		refs: refs.map((r) => (r ? (last = r) : last)),
-		opacities: refs.map((r) => (r ? '1' : '0'))
+		positions: filled.map((f) => f.position),
+		refs: filled.map((f) => f.ref),
+		opacities: frames.map((f) => (f ? '1' : '0'))
 	};
 };
 
@@ -206,30 +203,42 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 	const durationMs = Math.round(Math.max((totalFrames * DELTA_TIME) / BURROW_DURATION_DIVISOR, BURROW_MIN_DURATION_MS));
 	const snapshots = store.snapshots;
 
-	const soilColor = (hardness: number) => (hardness > 0 ? theme.intensityColors[hardness] : palette.tunnel);
+	// Tunnel cells are left transparent so the textured tunnel floor shows through underneath.
+	const soilColor = (hardness: number) => (hardness > 0 ? theme.intensityColors[hardness] : 'transparent');
+	const animate = (attributeName: string, anim: AnimationData | null) =>
+		anim
+			? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
+			: '';
 
 	let cells = '';
 	for (let x = 0; x < GRID_WIDTH; x++) {
 		for (let y = 0; y < GRID_HEIGHT; y++) {
 			const fills = snapshots.map((s) => soilColor(s.soil[x][y]));
-			const anim = generateChangingValuesAnimation(fills);
-			// Cells cover the gaps too: the soil is one continuous field, softened by the blur below.
-			cells += `<rect x="${toX(x)}" y="${toY(y)}" width="${PITCH}" height="${PITCH}" fill="${fills[0]}">`;
-			if (anim) {
-				cells += `<animate attributeName="fill" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`;
+			if (fills.every((f) => f === 'transparent')) continue;
+			// Cells are drawn edge to edge (no gaps) and shrink a step with each scrape while they are being dug.
+			// Once a cell is dug out it is transparent, so it keeps its last size until the soil regrows; that
+			// saves a keyframe per cell.
+			let scale = CRUMBLE_SCALES[0];
+			const scales = snapshots.map((s) => {
+				if (s.soil[x][y] > 0) scale = CRUMBLE_SCALES[crumbleStage(store.initialSoil[x]?.[y] ?? 0, s.soil[x][y])];
+				return scale;
+			});
+			const scaleAnim = generateChangingValuesAnimation(scales);
+			cells += `<rect x="${-PITCH / 2}" y="${-PITCH / 2}" width="${PITCH}" height="${PITCH}" fill="${fills[0]}" transform="translate(${centerX(x) + GAP_SIZE / 2} ${centerY(y) + GAP_SIZE / 2})">`;
+			cells += animate('fill', generateChangingValuesAnimation(fills));
+			if (scaleAnim) {
+				cells += `<animateTransform attributeName="transform" type="scale" additive="sum" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${scaleAnim.keyTimes}" values="${scaleAnim.values}"/>`;
 			}
 			cells += `</rect>`;
 		}
 	}
 
 	const timelines: SpriteTimeline[] = [
-		...buildCrumbleTimelines(store),
 		...store.pebbles.map((_, i) => ({
 			positions: snapshots.map((s) => centerOf(s.pebbles[i])),
 			refs: snapshots.map((s) => pebbleRef(s.pebbles[i])),
 			opacities: snapshots.map((s) => (s.pebbles[i].state === 'gone' ? '0' : '1'))
 		})),
-		buildLanternGlowTimeline(store),
 		...store.beetles.map((_, i) => ({
 			positions: snapshots.map((s) => centerOf(s.beetles[i])),
 			refs: snapshots.map((s) => beetleRef(s.beetles[i])),
@@ -244,10 +253,11 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 			positions: snapshots.map((s) => centerOf(s.wombat)),
 			refs: snapshots.map((s) => wombatRef(s.wombat)),
 			opacities: snapshots.map((s) => (s.wombat.visible ? '1' : '0'))
-		}
+		},
+		buildNoteTimeline(store)
 	];
 
-	// Sprites that never show (an unused crumble slot, say) are neither drawn nor defined.
+	// Sprites that never show (the notes, on a graph with no beetles in reach) are neither drawn nor defined.
 	const visible = timelines.filter((t) => t.opacities.some((o) => o !== '0'));
 	const usedRefs = new Set(visible.flatMap((t) => t.refs));
 
@@ -256,7 +266,8 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 	svg += buildSpriteDefs(palette, usedRefs).replace('<defs>', `<defs>${buildSoilDefs(width)}`);
 	svg += `<rect width="100%" height="100%" fill="${theme.gridBackground}"/>`;
 	svg += buildMonthLabels(store);
-	svg += `<g filter="url(#burrow-soil)" clip-path="url(#burrow-field)">${cells}</g>`;
+	svg += `<g clip-path="url(#burrow-field)"><rect x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" fill="${palette.tunnel}"/>`;
+	svg += `<g filter="url(#burrow-soil)">${cells}</g></g>`;
 	svg += visible.map((t) => renderSprite(t, durationMs)).join('');
 	svg += `</svg>`;
 	return svg;
