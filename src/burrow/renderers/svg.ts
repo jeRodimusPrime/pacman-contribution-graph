@@ -12,7 +12,7 @@ import {
 	GRID_WIDTH
 } from '../core/constants';
 import { BurrowSnapshot, BurrowStore, Position } from '../types';
-import { beetleRef, buildSpriteDefs, crumbleRef, crumbleStage, getBurrowPalette, pebbleRef, wombatRef } from './sprites';
+import { beetleRef, buildSpriteDefs, crumbleRef, crumbleStage, getBurrowPalette, lanternGlowRef, pebbleRef, wombatRef } from './sprites';
 
 const toX = (x: number) => x * (CELL_SIZE + GAP_SIZE);
 const toY = (y: number) => y * (CELL_SIZE + GAP_SIZE) + BURROW_HEADER_HEIGHT;
@@ -167,6 +167,17 @@ const buildCrumbleTimelines = (store: BurrowStore): SpriteTimeline[] => {
 	});
 };
 
+/** The lantern glow follows the wombat and only shows while the lantern is up. */
+const buildLanternGlowTimeline = (store: BurrowStore): SpriteTimeline => {
+	const refs = store.snapshots.map((s) => lanternGlowRef(s.wombat));
+	let last = refs.find((r) => r !== null) ?? '#bg-side-r';
+	return {
+		positions: store.snapshots.map((s) => centerOf(s.wombat)),
+		refs: refs.map((r) => (r ? (last = r) : last)),
+		opacities: refs.map((r) => (r ? '1' : '0'))
+	};
+};
+
 const isInSoil = (snapshot: BurrowSnapshot, { x, y }: Position) => (snapshot.soil[x]?.[y] ?? 0) > 0;
 
 const generateAnimatedSVG = (store: BurrowStore): string => {
@@ -200,6 +211,7 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 			refs: snapshots.map((s) => pebbleRef(s.pebbles[i])),
 			opacities: snapshots.map((s) => (s.pebbles[i].state === 'gone' ? '0' : '1'))
 		})),
+		buildLanternGlowTimeline(store),
 		...store.beetles.map((_, i) => ({
 			positions: snapshots.map((s) => centerOf(s.beetles[i])),
 			refs: snapshots.map((s) => beetleRef(s.beetles[i])),

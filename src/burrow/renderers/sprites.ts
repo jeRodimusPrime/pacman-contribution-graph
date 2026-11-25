@@ -73,11 +73,18 @@ export const wombatRef = (wombat: Pick<Wombat, 'pose' | 'facing' | 'digPhase' | 
 		case 'dig':
 			return `#bw-dig${wombat.digPhase}-${wombat.facing[0]}`;
 		case 'lantern':
-			return `#bw-lantern${wombat.lanternAim === 'side' ? '' : `-${wombat.lanternAim[0]}`}-${wombat.facing[0]}`;
+			return `#bw-lantern-${wombat.facing[0]}`;
 		default:
 			return `#bw-walk-${wombat.facing[0]}`;
 	}
 };
+
+/**
+ * The lantern's light, drawn on its own layer behind the beetles so a lit beetle sits in the light instead of
+ * being washed out by it. Pulses brighter every other frame. `null` when the lantern is down.
+ */
+export const lanternGlowRef = (wombat: Pick<Wombat, 'pose' | 'facing' | 'digPhase' | 'lanternAim'>) =>
+	wombat.pose === 'lantern' ? `#bg-${wombat.lanternAim}${wombat.digPhase ? '-bright' : ''}-${wombat.facing[0]}` : null;
 
 export const beetleRef = (beetle: Pick<Beetle, 'state' | 'facing' | 'drowsiness'>) => {
 	switch (beetle.state) {
@@ -126,9 +133,9 @@ const crumbs = (c: BurrowPalette, points: [number, number][]) =>
 	points.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="0.9" fill="${c.furShade}" opacity="0.8"/>`).join('');
 
 /** A soft cone of light from the lantern towards the beetle, plus a halo round the lantern itself. */
-const lanternGlow = (c: BurrowPalette, cx: number, cy: number, rx: number, ry: number) =>
-	`<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${c.glow}" opacity="0.28"/>` +
-	`<circle cx="11" cy="1" r="6" fill="${c.glow}" opacity="0.4"/>`;
+const lanternGlow = (c: BurrowPalette, cx: number, cy: number, rx: number, ry: number, bright = false) =>
+	`<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${c.glow}" opacity="${bright ? 0.4 : 0.28}"/>` +
+	`<circle cx="11" cy="1" r="${bright ? 8 : 6}" fill="${c.glow}" opacity="${bright ? 0.5 : 0.4}"/>`;
 
 const wombatWithLantern = (c: BurrowPalette) =>
 	wombatBody(c) +
@@ -152,9 +159,13 @@ const wombatSprites = (c: BurrowPalette): Record<string, string> => ({
 			[12, 0.5],
 			[11, 7]
 		]),
-	'bw-lantern-r': lanternGlow(c, 22, 1, 14, 6) + wombatWithLantern(c),
-	'bw-lantern-u-r': lanternGlow(c, 10.5, -14, 6, 14) + wombatWithLantern(c),
-	'bw-lantern-d-r': lanternGlow(c, 10.5, 16, 6, 14) + wombatWithLantern(c),
+	'bw-lantern-r': wombatWithLantern(c),
+	'bg-side-r': lanternGlow(c, 22, 1, 14, 6),
+	'bg-up-r': lanternGlow(c, 10.5, -14, 6, 14),
+	'bg-down-r': lanternGlow(c, 10.5, 16, 6, 14),
+	'bg-side-bright-r': lanternGlow(c, 22, 1, 15, 7, true),
+	'bg-up-bright-r': lanternGlow(c, 10.5, -14, 7, 15, true),
+	'bg-down-bright-r': lanternGlow(c, 10.5, 16, 7, 15, true),
 	'bw-sleep':
 		`<ellipse cx="0" cy="3" rx="8.5" ry="6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1.1"/>` +
 		`<path d="M-6 5 Q0 8.5 6 5" fill="none" stroke="${c.furShade}" stroke-width="1" stroke-linecap="round"/>` +

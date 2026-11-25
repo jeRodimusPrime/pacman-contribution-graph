@@ -18,10 +18,12 @@ export type WombatPose = 'walk' | 'dig' | 'lantern' | 'sleep';
 export interface Wombat extends Position {
 	facing: Facing;
 	pose: WombatPose;
-	/** Alternates every dig frame so the claws visibly scrabble. */
+	/** Alternates every dig or lantern frame, so the claws scrabble and the lantern glow pulses. */
 	digPhase: number;
 	/** Frames until the lantern can be raised again. */
 	lanternCooldown: number;
+	/** Frames the lantern stays raised for the current flash. */
+	lanternHold: number;
 	/** Which way the lantern light points while the pose is `lantern`. */
 	lanternAim: 'side' | 'up' | 'down';
 	visible: boolean;

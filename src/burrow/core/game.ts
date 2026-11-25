@@ -14,6 +14,7 @@ import {
 	BURROW_END_HOLD_FRAMES,
 	BURROW_FREEZE_FRAMES,
 	BURROW_LANTERN_COOLDOWN,
+	BURROW_LANTERN_HOLD_FRAMES,
 	BURROW_LANTERN_RANGE,
 	BURROW_LEVEL_POINTS,
 	BURROW_LULL_HITS,
@@ -162,7 +163,16 @@ const resetGameState = (store: BurrowStore): Random => {
 	store.pebbles = placePebbles(store, random);
 	store.initialSoil = cloneSoil(store.soil);
 	store.beetles = placeBeetles(store, random);
-	store.wombat = { ...BURROW_DEN, facing: 'right', pose: 'walk', digPhase: 0, lanternCooldown: 0, lanternAim: 'side', visible: true };
+	store.wombat = {
+		...BURROW_DEN,
+		facing: 'right',
+		pose: 'walk',
+		digPhase: 0,
+		lanternCooldown: 0,
+		lanternHold: 0,
+		lanternAim: 'side',
+		visible: true
+	};
 
 	pushSnapshot(store);
 	return random;
@@ -217,6 +227,9 @@ const raiseLantern = (store: BurrowStore, beetle: Beetle, frame: number) => {
 	wombat.pose = 'lantern';
 	wombat.facing = facingTowards(wombat, beetle, wombat.facing);
 	wombat.lanternAim = beetle.y < wombat.y ? 'up' : beetle.y > wombat.y ? 'down' : 'side';
+	wombat.digPhase = 0;
+	// The flash frame counts as the first held frame; the cooldown starts once the lantern comes down.
+	wombat.lanternHold = BURROW_LANTERN_HOLD_FRAMES - 1;
 	wombat.lanternCooldown = BURROW_LANTERN_COOLDOWN + 1;
 
 	beetle.drowsiness++;
@@ -281,12 +294,22 @@ export const planWombatPath = (store: BurrowStore): Position[] | null => {
 /** Returns true when the wombat dug or lulled something this frame. */
 const moveWombat = (store: BurrowStore, frame: number): boolean => {
 	const { wombat } = store;
+	if (wombat.lanternHold > 0) {
+		wombat.lanternHold--;
+		wombat.digPhase = 1 - wombat.digPhase;
+		return true;
+	}
 	wombat.lanternCooldown = Math.max(0, wombat.lanternCooldown - 1);
 	wombat.pose = 'walk';
 
-	const beetle = wombat.lanternCooldown === 0 ? findLanternTarget(store) : null;
-	if (beetle) {
+	const beetle = findLanternTarget(store);
+	if (beetle && wombat.lanternCooldown === 0) {
 		raiseLantern(store, beetle, frame);
+		return true;
+	}
+	// Mid-lullaby: wait for the lantern to be ready again rather than wandering out of reach.
+	if (beetle && beetle.drowsiness > 0) {
+		wombat.facing = facingTowards(wombat, beetle, wombat.facing);
 		return true;
 	}
 
@@ -434,7 +457,15 @@ const playEnding = (store: BurrowStore) => {
 	store.wombat.visible = false;
 	for (const pebble of store.pebbles) pebble.state = 'gone';
 	pushSnapshot(store);
-	Object.assign(store.wombat, { ...BURROW_DEN, facing: 'right', pose: 'walk', digPhase: 0, lanternCooldown: 0, lanternAim: 'side' });
+	Object.assign(store.wombat, {
+		...BURROW_DEN,
+		facing: 'right',
+		pose: 'walk',
+		digPhase: 0,
+		lanternCooldown: 0,
+		lanternHold: 0,
+		lanternAim: 'side'
+	});
 	for (const beetle of store.beetles) Object.assign(beetle, { ...beetle.spawn, state: 'hidden', facing: 'left', drowsiness: 0 });
 	for (const pebble of store.pebbles) Object.assign(pebble, { ...pebble.spawn, timer: 0 });
 	pushSnapshot(store);

@@ -9,7 +9,17 @@ export const Store: BurrowStore = {
 	frameCount: 0,
 	soil: [],
 	initialSoil: [],
-	wombat: { x: -1, y: 3, facing: 'right', pose: 'walk', digPhase: 0, lanternCooldown: 0, lanternAim: 'side', visible: true },
+	wombat: {
+		x: -1,
+		y: 3,
+		facing: 'right',
+		pose: 'walk',
+		digPhase: 0,
+		lanternCooldown: 0,
+		lanternHold: 0,
+		lanternAim: 'side',
+		visible: true
+	},
 	beetles: [],
 	pebbles: [],
 	snapshots: [],

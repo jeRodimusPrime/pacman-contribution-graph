@@ -7,6 +7,8 @@ import {
 	BURROW_BONK_POINTS,
 	BURROW_DEN,
 	BURROW_END_HOLD_FRAMES,
+	BURROW_LANTERN_COOLDOWN,
+	BURROW_LANTERN_HOLD_FRAMES,
 	BURROW_LANTERN_RANGE,
 	BURROW_LULL_HITS,
 	BURROW_LULL_POINTS,
@@ -162,6 +164,27 @@ describe('burrow rules', () => {
 		}
 	});
 
+	it('sings a slow lullaby: each flash is held, and the wombat waits between flashes', () => {
+		const store = createScenarioStore('gradient');
+		simulate(store);
+
+		const lulled = store.beetles.find((b) => store.snapshots.some((s) => s.beetles[b.id].state === 'asleep')) as Beetle;
+		const hits = store.snapshots
+			.map((s, i) => ({ i, drowsiness: s.beetles[lulled.id].drowsiness }))
+			.filter(({ i, drowsiness }) => i > 0 && drowsiness > store.snapshots[i - 1].beetles[lulled.id].drowsiness)
+			.map(({ i }) => i);
+
+		const lastLull = hits.slice(-BURROW_LULL_HITS);
+		expect(lastLull).toHaveLength(BURROW_LULL_HITS);
+		for (let k = 1; k < lastLull.length; k++) {
+			expect(lastLull[k] - lastLull[k - 1]).toBe(BURROW_LANTERN_HOLD_FRAMES + BURROW_LANTERN_COOLDOWN);
+		}
+		for (const hit of lastLull) {
+			const poses = store.snapshots.slice(hit, hit + BURROW_LANTERN_HOLD_FRAMES).map((s) => s.wombat.pose);
+			expect(poses.every((pose) => pose === 'lantern')).toBe(true);
+		}
+	});
+
 	it('drops pebbles once the soil underneath is dug out, and they crumble away', () => {
 		const store = createScenarioStore('full');
 		simulate(store);
@@ -297,6 +320,17 @@ describe('burrow svg', () => {
 		const store = createStoreWithLevels([{ x: 0, y: BURROW_DEN.y, level: 1 }]);
 		simulate(store);
 		expect(Renderer.generateAnimatedSVG(store)).not.toContain('#bc-');
+	});
+
+	it('draws the lantern glow behind the beetles', () => {
+		const store = createScenarioStore('gradient');
+		simulate(store);
+		const svg = Renderer.generateAnimatedSVG(store);
+
+		const glow = svg.search(/<use href="#bg-/);
+		const firstBeetle = svg.search(/<use href="#bb-/);
+		expect(glow).toBeGreaterThan(0);
+		expect(glow).toBeLessThan(firstBeetle);
 	});
 
 	it('uses warm tunnels and the theme palette for soil', () => {
