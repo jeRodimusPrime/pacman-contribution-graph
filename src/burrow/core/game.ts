@@ -239,12 +239,16 @@ const wombatStepCost = (store: BurrowStore, p: Position): number | null => {
 /** Leftmost column that still has soil in it. */
 const soilFrontier = (store: BurrowStore) => store.soil.findIndex((column) => column.some((h) => h > 0));
 
+/** A cell somewhere below a pebble that has yet to fall. A pebble never falls onto the wombat, so standing here stalls it. */
+const isUnderPebble = (store: BurrowStore, p: Position) =>
+	store.pebbles.some((pebble) => pebble.state !== 'gone' && pebble.state !== 'crumble' && pebble.x === p.x && pebble.y < p.y);
+
 /**
  * Where the wombat heads next: the cheapest soil near the left edge of what is left (so it works through the
  * graph from left to right instead of leaving dense days behind), any soil if that is blocked, or, once the soil
- * is gone, the nearest awake beetle.
+ * is gone, out from under any pebble still waiting to drop, then the nearest awake beetle.
  */
-const planWombatPath = (store: BurrowStore): Position[] | null => {
+export const planWombatPath = (store: BurrowStore): Position[] | null => {
 	const { wombat } = store;
 	const frontier = soilFrontier(store);
 	if (frontier >= 0) {
@@ -253,6 +257,13 @@ const planWombatPath = (store: BurrowStore): Position[] | null => {
 		return (
 			findCheapestPath(wombat, stepCost, (p) => isSoil(p) && p.x <= frontier + BURROW_SWEEP_WIDTH) ??
 			findCheapestPath(wombat, stepCost, isSoil)
+		);
+	}
+	if (isUnderPebble(store, wombat)) {
+		return findCheapestPath(
+			wombat,
+			(p) => wombatStepCost(store, p),
+			(p) => !isUnderPebble(store, p)
 		);
 	}
 	if (!store.beetles.some((b) => b.state === 'awake')) return null;

@@ -13,7 +13,7 @@ import {
 	BURROW_NAP_END_FRAMES,
 	BURROW_REGROW_FRAMES
 } from '../core/constants';
-import { findLanternTarget, simulate } from '../core/game';
+import { findLanternTarget, planWombatPath, simulate } from '../core/game';
 import { Store } from '../core/store';
 import { Renderer } from '../renderers/svg';
 import { Beetle, BurrowSnapshot, BurrowStore } from '../types';
@@ -174,6 +174,18 @@ describe('burrow rules', () => {
 			expect(states.slice(0, firstWobble).every((s) => s === 'resting')).toBe(true);
 			expect(states.indexOf('crumble')).toBeGreaterThan(firstWobble);
 		}
+	});
+
+	it('steps out from under the last pebble so it can fall', () => {
+		const store = createStoreWithLevels();
+		simulate(store);
+		store.beetles = [];
+		store.pebbles = [{ id: 0, x: 10, y: 2, state: 'resting', timer: 0, level: 4, spawn: { x: 10, y: 2 } }];
+		store.wombat = { ...store.wombat, x: 10, y: 3, visible: true };
+
+		const path = planWombatPath(store);
+		expect(path).not.toBeNull();
+		expect(path && path[path.length - 1].x).not.toBe(10);
 	});
 
 	describe('lantern', () => {
