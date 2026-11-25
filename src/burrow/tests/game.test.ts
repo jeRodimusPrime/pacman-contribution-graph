@@ -322,6 +322,16 @@ describe('burrow svg', () => {
 		expect(Renderer.generateAnimatedSVG(store)).not.toContain('#bc-');
 	});
 
+	it('draws the soil as one continuous, blended field', () => {
+		const store = createScenarioStore('random');
+		simulate(store);
+		const svg = Renderer.generateAnimatedSVG(store);
+
+		expect(svg).toContain('<filter id="burrow-soil"');
+		expect(svg).toContain('<g filter="url(#burrow-soil)" clip-path="url(#burrow-field)">');
+		expect(svg).toContain(`<rect x="22" y="${24 + 22}" width="22" height="22" fill=`);
+	});
+
 	it('draws the lantern glow behind the beetles', () => {
 		const store = createScenarioStore('gradient');
 		simulate(store);

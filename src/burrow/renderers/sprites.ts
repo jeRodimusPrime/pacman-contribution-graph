@@ -247,8 +247,8 @@ export const crumbleStage = (initial: number, remaining: number) =>
 
 export const crumbleRef = (stage: number) => `#bc-${stage}`;
 
-/** Clip so holes punched near a corner follow the cell's rounded edge. */
-const CRUMBLE_CLIP = `<clipPath id="bc-clip"><rect x="-10" y="-10" width="20" height="20" rx="3"/></clipPath>`;
+/** Holes are clipped to a round clod so they sit softly on the blended soil instead of showing square edges. */
+const CRUMBLE_CLIP = `<clipPath id="bc-clip"><circle r="10.5"/></clipPath>`;
 
 /**
  * Holes are painted in the tunnel colour, so whatever is left of the cell keeps its current soil shade

@@ -1,10 +1,11 @@
 import { AnimationData } from '../../shared/types';
 import { Utils } from '../../shared/utils/utils';
 import {
-	BURROW_CELL_RADIUS,
+	BURROW_FIELD_RADIUS,
 	BURROW_DURATION_DIVISOR,
 	BURROW_HEADER_HEIGHT,
 	BURROW_MIN_DURATION_MS,
+	BURROW_SOIL_BLUR,
 	CELL_SIZE,
 	DELTA_TIME,
 	GAP_SIZE,
@@ -13,6 +14,22 @@ import {
 } from '../core/constants';
 import { BurrowSnapshot, BurrowStore, Position } from '../types';
 import { beetleRef, buildSpriteDefs, crumbleRef, crumbleStage, getBurrowPalette, lanternGlowRef, pebbleRef, wombatRef } from './sprites';
+
+const PITCH = CELL_SIZE + GAP_SIZE;
+const FIELD_TOP = BURROW_HEADER_HEIGHT;
+const FIELD_HEIGHT = GRID_HEIGHT * PITCH;
+
+/**
+ * The soil is drawn as one continuous field: neighbouring days blur into each other like layers of earth.
+ * The blur would fade the field's outer edge into the background, so alpha is forced back to fully opaque
+ * (feComponentTransfer works on un-premultiplied colour, so edge colours come out true, not darkened).
+ */
+const buildSoilDefs = (width: number) =>
+	`<filter id="burrow-soil" filterUnits="userSpaceOnUse" x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" color-interpolation-filters="sRGB">` +
+	`<feGaussianBlur stdDeviation="${BURROW_SOIL_BLUR}" edgeMode="duplicate"/>` +
+	`<feComponentTransfer><feFuncA type="table" tableValues="1 1"/></feComponentTransfer>` +
+	`</filter>` +
+	`<clipPath id="burrow-field"><rect x="0" y="${FIELD_TOP}" width="${width - GAP_SIZE}" height="${FIELD_HEIGHT - GAP_SIZE}" rx="${BURROW_FIELD_RADIUS}"/></clipPath>`;
 
 const toX = (x: number) => x * (CELL_SIZE + GAP_SIZE);
 const toY = (y: number) => y * (CELL_SIZE + GAP_SIZE) + BURROW_HEADER_HEIGHT;
@@ -196,7 +213,8 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 		for (let y = 0; y < GRID_HEIGHT; y++) {
 			const fills = snapshots.map((s) => soilColor(s.soil[x][y]));
 			const anim = generateChangingValuesAnimation(fills);
-			cells += `<rect x="${toX(x)}" y="${toY(y)}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="${BURROW_CELL_RADIUS}" fill="${fills[0]}">`;
+			// Cells cover the gaps too: the soil is one continuous field, softened by the blur below.
+			cells += `<rect x="${toX(x)}" y="${toY(y)}" width="${PITCH}" height="${PITCH}" fill="${fills[0]}">`;
 			if (anim) {
 				cells += `<animate attributeName="fill" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`;
 			}
@@ -235,10 +253,10 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 
 	let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" color-interpolation="sRGB">`;
 	svg += `<desc>Burrow: a wombat digs cozy tunnels through a contribution graph.</desc>`;
-	svg += buildSpriteDefs(palette, usedRefs);
+	svg += buildSpriteDefs(palette, usedRefs).replace('<defs>', `<defs>${buildSoilDefs(width)}`);
 	svg += `<rect width="100%" height="100%" fill="${theme.gridBackground}"/>`;
 	svg += buildMonthLabels(store);
-	svg += cells;
+	svg += `<g filter="url(#burrow-soil)" clip-path="url(#burrow-field)">${cells}</g>`;
 	svg += visible.map((t) => renderSprite(t, durationMs)).join('');
 	svg += `</svg>`;
 	return svg;

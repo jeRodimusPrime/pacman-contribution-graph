@@ -3,7 +3,10 @@ import { CELL_SIZE, DELTA_TIME, GAP_SIZE, GRID_HEIGHT, GRID_WIDTH } from '../../
 export { CELL_SIZE, DELTA_TIME, GAP_SIZE, GRID_HEIGHT, GRID_WIDTH };
 
 export const BURROW_HEADER_HEIGHT = 24;
-export const BURROW_CELL_RADIUS = 3;
+/** Blur radius (stdDeviation, px) that softens the soil into one continuous, blended field. */
+export const BURROW_SOIL_BLUR = 6;
+/** Corner radius of the soil field as a whole. */
+export const BURROW_FIELD_RADIUS = 8;
 export const BURROW_MIN_DURATION_MS = 5000;
 /** Frames play a little faster than the shared DELTA_TIME: digging dense days takes a lot of them. */
 export const BURROW_DURATION_DIVISOR = 2;
