@@ -3686,6 +3686,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Game: () => (/* binding */ Game),
 /* harmony export */   findLanternTarget: () => (/* binding */ findLanternTarget),
+/* harmony export */   planWombatPath: () => (/* binding */ planWombatPath),
 /* harmony export */   simulate: () => (/* binding */ simulate)
 /* harmony export */ });
 /* harmony import */ var _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../shared/utils/utils */ "./src/shared/utils/utils.ts");
@@ -3869,10 +3870,12 @@ const wombatStepCost = (store, p) => {
 };
 /** Leftmost column that still has soil in it. */
 const soilFrontier = (store) => store.soil.findIndex((column) => column.some((h) => h > 0));
+/** A cell somewhere below a pebble that has yet to fall. A pebble never falls onto the wombat, so standing here stalls it. */
+const isUnderPebble = (store, p) => store.pebbles.some((pebble) => pebble.state !== 'gone' && pebble.state !== 'crumble' && pebble.x === p.x && pebble.y < p.y);
 /**
  * Where the wombat heads next: the cheapest soil near the left edge of what is left (so it works through the
  * graph from left to right instead of leaving dense days behind), any soil if that is blocked, or, once the soil
- * is gone, the nearest awake beetle.
+ * is gone, out from under any pebble still waiting to drop, then the nearest awake beetle.
  */
 const planWombatPath = (store) => {
     var _a;
@@ -3882,6 +3885,9 @@ const planWombatPath = (store) => {
         const stepCost = (p) => wombatStepCost(store, p);
         const isSoil = (p) => store.soil[p.x][p.y] > 0;
         return ((_a = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, stepCost, (p) => isSoil(p) && p.x <= frontier + _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_SWEEP_WIDTH)) !== null && _a !== void 0 ? _a : (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, stepCost, isSoil));
+    }
+    if (isUnderPebble(store, wombat)) {
+        return (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, (p) => wombatStepCost(store, p), (p) => !isUnderPebble(store, p));
     }
     if (!store.beetles.some((b) => b.state === 'awake'))
         return null;
@@ -4230,8 +4236,11 @@ class BurrowRenderer {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   CRUMBLE_STAGES: () => (/* binding */ CRUMBLE_STAGES),
 /* harmony export */   beetleRef: () => (/* binding */ beetleRef),
 /* harmony export */   buildSpriteDefs: () => (/* binding */ buildSpriteDefs),
+/* harmony export */   crumbleRef: () => (/* binding */ crumbleRef),
+/* harmony export */   crumbleStage: () => (/* binding */ crumbleStage),
 /* harmony export */   getBurrowPalette: () => (/* binding */ getBurrowPalette),
 /* harmony export */   pebbleRef: () => (/* binding */ pebbleRef),
 /* harmony export */   wombatRef: () => (/* binding */ wombatRef)
@@ -4396,6 +4405,43 @@ const pebbleSprites = (c) => ({
     'bp-crumble': `<path d="M-7 5 l3 -4 l3 4z M-1 6 l3 -5 l3 5z M4 5 l2 -3 l2 3z" fill="${c.pebble}" stroke="${c.outline}" stroke-width="0.8"/>` +
         `<circle cx="-4" cy="-3" r="0.8" fill="${c.pebbleShade}"/><circle cx="3" cy="-4" r="0.7" fill="${c.pebbleShade}"/>`
 });
+/* ───────────────────────── Crumbling soil ───────────────────────── */
+/** Number of crumble stages drawn over a cell while it is being dug. */
+const CRUMBLE_STAGES = 3;
+/**
+ * Crumble stage (1…CRUMBLE_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
+ * cell is untouched or fully dug. A level-4 day goes through every stage; a level-1 day opens in one scrape.
+ */
+const crumbleStage = (initial, remaining) => remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * CRUMBLE_STAGES - 1e-9);
+const crumbleRef = (stage) => `#bc-${stage}`;
+/** Clip so holes punched near a corner follow the cell's rounded edge. */
+const CRUMBLE_CLIP = `<clipPath id="bc-clip"><rect x="-10" y="-10" width="20" height="20" rx="3"/></clipPath>`;
+/**
+ * Holes are painted in the tunnel colour, so whatever is left of the cell keeps its current soil shade
+ * underneath. Each stage keeps the holes of the one before, so the soil only ever falls away.
+ */
+const crumbleSprites = (c) => {
+    const hole = (d) => `<path d="${d}" fill="${c.tunnel}"/>`;
+    const crack = (d) => `<path d="${d}" fill="none" stroke="${c.outline}" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>`;
+    const crumb = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c.tunnel}"/>`;
+    const stage1 = hole('M4 -10 L10 -10 L10 -4 L7 -5 L5 -7Z') +
+        crack('M-6 -10 L-3 -4 L-6 1 M4 10 L2 5 L5 1 M5 -7 L1 -5') +
+        crumb(-1, -7, 0.9) +
+        crumb(7, 2, 0.7);
+    const stage2 = stage1 +
+        hole('M-10 3 L-5 2 L-3 6 L-4 10 L-10 10Z') +
+        hole('M-3 -4 L2 -5 L3 -1 L-1 1Z') +
+        crack('M-3 6 L1 3 L3 -1 M-10 -3 L-6 1') +
+        crumb(5, 6, 1) +
+        crumb(-7, -4, 0.8);
+    const stage3 = hole('M-10 -5 L-5 -10 L5 -10 L10 -2 L10 5 L5 10 L-5 10 L-10 4Z') +
+        crack('M-10 -5 L-5 -10 M10 5 L5 10') +
+        `<circle cx="-2" cy="1" r="1.4" fill="${c.outline}" opacity="0.25"/>` +
+        `<circle cx="3" cy="4" r="1" fill="${c.outline}" opacity="0.25"/>` +
+        `<circle cx="1" cy="-4" r="0.8" fill="${c.outline}" opacity="0.25"/>`;
+    const clipped = (body) => `<g clip-path="url(#bc-clip)">${body}</g>`;
+    return { 'bc-1': clipped(stage1), 'bc-2': clipped(stage2), 'bc-3': clipped(stage3) };
+};
 /** Facing left is the right-facing drawing mirrored. */
 const mirrored = (sprites) => {
     const result = Object.assign({}, sprites);
@@ -4407,7 +4453,7 @@ const mirrored = (sprites) => {
 };
 /** The <defs> block for every sprite referenced in `usedRefs` (plus whatever those depend on). */
 const buildSpriteDefs = (palette, usedRefs) => {
-    const all = mirrored(Object.assign(Object.assign(Object.assign({}, wombatSprites(palette)), beetleSprites(palette)), pebbleSprites(palette)));
+    const all = mirrored(Object.assign(Object.assign(Object.assign(Object.assign({}, wombatSprites(palette)), beetleSprites(palette)), pebbleSprites(palette)), crumbleSprites(palette)));
     const needed = new Set();
     const include = (id) => {
         if (needed.has(id) || !all[id])
@@ -4420,7 +4466,8 @@ const buildSpriteDefs = (palette, usedRefs) => {
     };
     for (const ref of usedRefs)
         include(ref.replace(/^#/, ''));
-    return `<defs>${[...needed].map((id) => `<g id="${id}">${all[id]}</g>`).join('')}</defs>`;
+    const clip = [...needed].some((id) => id.startsWith('bc-')) ? CRUMBLE_CLIP : '';
+    return `<defs>${clip}${[...needed].map((id) => `<g id="${id}">${all[id]}</g>`).join('')}</defs>`;
 };
 
 
@@ -4518,8 +4565,6 @@ const renderSprite = ({ positions, refs, opacities }, durationMs) => {
         ? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
         : '';
     const positionAnim = generateSteppedLinearAnimation(positions);
-    if (!opacities.some((o) => o !== '0'))
-        return '';
     let svg = `<use href="${refs[0]}" opacity="${opacities[0]}" transform="translate(${positions[0]})">`;
     svg += animate('href', generateChangingValuesAnimation(refs));
     svg += animate('opacity', generateChangingValuesAnimation(opacities));
@@ -4544,6 +4589,47 @@ const buildMonthLabels = (store) => {
     }
     return labels;
 };
+/** At most this many half-dug cells crumble at once; the wombat digs one at a time, so one spare is plenty. */
+const CRUMBLE_SLOTS = 2;
+/**
+ * Crumble overlays for every frame, one timeline per slot. A cell keeps the same slot for as long as it is
+ * half-dug, so its overlay never jumps between slots mid-crumble.
+ */
+const buildCrumbleTimelines = (store) => {
+    var _a, _b;
+    const slots = Array.from({ length: CRUMBLE_SLOTS }, () => []);
+    let assigned = Array(CRUMBLE_SLOTS).fill(null);
+    for (const snapshot of store.snapshots) {
+        const crumbling = new Map();
+        for (let x = 0; x < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_WIDTH; x++) {
+            for (let y = 0; y < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT; y++) {
+                const stage = (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.crumbleStage)((_b = (_a = store.initialSoil[x]) === null || _a === void 0 ? void 0 : _a[y]) !== null && _b !== void 0 ? _b : 0, snapshot.soil[x][y]);
+                if (stage > 0)
+                    crumbling.set(`${x}:${y}`, { position: { x, y }, stage });
+            }
+        }
+        assigned = assigned.map((key) => (key !== null && crumbling.has(key) ? key : null));
+        for (const key of crumbling.keys()) {
+            if (assigned.includes(key))
+                continue;
+            const free = assigned.indexOf(null);
+            if (free >= 0)
+                assigned[free] = key;
+        }
+        assigned.forEach((key, slot) => slots[slot].push(key === null ? null : crumbling.get(key)));
+    }
+    return slots.map((frames) => {
+        var _a;
+        // An idle slot stays where it last was (hidden) so it never slides across the board.
+        let last = (_a = frames.find((f) => f !== null)) !== null && _a !== void 0 ? _a : { position: { x: 0, y: 0 }, stage: 1 };
+        const filled = frames.map((f) => (f ? (last = f) : last));
+        return {
+            positions: filled.map((f) => centerOf(f.position)),
+            refs: filled.map((f) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.crumbleRef)(f.stage)),
+            opacities: frames.map((f) => (f ? '1' : '0'))
+        };
+    });
+};
 const isInSoil = (snapshot, { x, y }) => { var _a, _b; return ((_b = (_a = snapshot.soil[x]) === null || _a === void 0 ? void 0 : _a[y]) !== null && _b !== void 0 ? _b : 0) > 0; };
 const generateAnimatedSVG = (store) => {
     const theme = _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__.Utils.getCurrentTheme(store);
@@ -4567,6 +4653,7 @@ const generateAnimatedSVG = (store) => {
         }
     }
     const timelines = [
+        ...buildCrumbleTimelines(store),
         ...store.pebbles.map((_, i) => ({
             positions: snapshots.map((s) => centerOf(s.pebbles[i])),
             refs: snapshots.map((s) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.pebbleRef)(s.pebbles[i])),
@@ -4589,14 +4676,16 @@ const generateAnimatedSVG = (store) => {
             opacities: snapshots.map((s) => (s.wombat.visible ? '1' : '0'))
         }
     ];
-    const usedRefs = new Set(timelines.flatMap((t) => t.refs));
+    // Sprites that never show (an unused crumble slot, say) are neither drawn nor defined.
+    const visible = timelines.filter((t) => t.opacities.some((o) => o !== '0'));
+    const usedRefs = new Set(visible.flatMap((t) => t.refs));
     let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" color-interpolation="sRGB">`;
     svg += `<desc>Burrow: a wombat digs cozy tunnels through a contribution graph.</desc>`;
     svg += (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.buildSpriteDefs)(palette, usedRefs);
     svg += `<rect width="100%" height="100%" fill="${theme.gridBackground}"/>`;
     svg += buildMonthLabels(store);
     svg += cells;
-    svg += timelines.map((t) => renderSprite(t, durationMs)).join('');
+    svg += visible.map((t) => renderSprite(t, durationMs)).join('');
     svg += `</svg>`;
     return svg;
 };
