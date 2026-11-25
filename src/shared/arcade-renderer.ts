@@ -1,5 +1,6 @@
 import { BombermanConfig, BombermanRenderer } from '../bomberman/index';
 import { BreakoutConfig, BreakoutRenderer } from '../breakout/index';
+import { BurrowConfig, BurrowRenderer } from '../burrow/index';
 import { GalagaConfig, GalagaRenderer } from '../galaga/index';
 import { MinesweeperConfig, MinesweeperRenderer } from '../minesweeper/index';
 import { PacmanConfig, PacmanRenderer, PlayerStyle } from '../pacman/index';
@@ -52,6 +53,10 @@ const gameRegistry = {
 	tetris: {
 		label: '🟪 Tetris',
 		factory: (conf: ArcadeConfig) => new TetrisRenderer(conf as TetrisConfig)
+	},
+	burrow: {
+		label: '🐾 Burrow',
+		factory: (conf: ArcadeConfig) => new BurrowRenderer(conf as BurrowConfig)
 	}
 } satisfies Record<string, GameRegistryEntry>;
 
