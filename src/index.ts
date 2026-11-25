@@ -1,5 +1,6 @@
 export { BombermanRenderer } from './bomberman/index';
 export { BreakoutRenderer } from './breakout/index';
+export { BurrowRenderer } from './burrow/index';
 export { GalagaRenderer } from './galaga/index';
 export { MinesweeperRenderer } from './minesweeper/index';
 export { PacmanRenderer, PlayerStyle } from './pacman/index';

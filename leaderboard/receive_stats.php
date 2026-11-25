@@ -57,7 +57,7 @@ $steps = (int) $data['steps'];
 $ghostsEaten = (int) $data['ghosts_eaten'];
 $timestamp = time();
 
-$allowedGameTypes = ['pacman', 'breakout', 'galaga', 'puzzle-bobble', 'bomberman', 'minesweeper', 'snake', 'tetris'];
+$allowedGameTypes = ['pacman', 'breakout', 'galaga', 'puzzle-bobble', 'bomberman', 'minesweeper', 'snake', 'tetris', 'burrow'];
 
 // Sanity checks
 if (strlen($username) < 1 || strlen($username) > 100) {
