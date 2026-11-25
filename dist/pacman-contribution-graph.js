@@ -3573,6 +3573,56 @@ const findShortestPath = (start, canEnter, isTarget) => {
 
 /***/ }),
 
+/***/ "./src/burrow/core/board.ts":
+/*!**********************************!*\
+  !*** ./src/burrow/core/board.ts ***!
+  \**********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   LOOSE_PEBBLE_STATES: () => (/* binding */ LOOSE_PEBBLE_STATES),
+/* harmony export */   UNFALLEN_PEBBLE_STATES: () => (/* binding */ UNFALLEN_PEBBLE_STATES),
+/* harmony export */   addScore: () => (/* binding */ addScore),
+/* harmony export */   beetleAt: () => (/* binding */ beetleAt),
+/* harmony export */   cloneSoil: () => (/* binding */ cloneSoil),
+/* harmony export */   countSoil: () => (/* binding */ countSoil),
+/* harmony export */   facingTowards: () => (/* binding */ facingTowards),
+/* harmony export */   isBelowPebble: () => (/* binding */ isBelowPebble),
+/* harmony export */   isTunnel: () => (/* binding */ isTunnel),
+/* harmony export */   pebbleAt: () => (/* binding */ pebbleAt),
+/* harmony export */   soilAt: () => (/* binding */ soilAt)
+/* harmony export */ });
+/* harmony import */ var _ai__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ai */ "./src/burrow/core/ai.ts");
+
+/** Queries about the board that the wombat, the beetles and the pebbles all rely on. */
+const cloneSoil = (soil) => soil.map((column) => [...column]);
+/** Remaining hardness of a cell: 0 for open tunnel (or anywhere off the board, such as the den). */
+const soilAt = (store, p) => ((0,_ai__WEBPACK_IMPORTED_MODULE_0__.inBounds)(p) ? store.soil[p.x][p.y] : 0);
+const isTunnel = (store, p) => (0,_ai__WEBPACK_IMPORTED_MODULE_0__.inBounds)(p) && store.soil[p.x][p.y] === 0;
+const countSoil = (soil) => soil.reduce((sum, column) => sum + column.filter((h) => h > 0).length, 0);
+/** The pebble occupying `p`, if any. A pebble is solid until it has crumbled away completely. */
+const pebbleAt = (store, p) => store.pebbles.find((pebble) => pebble.state !== 'gone' && (0,_ai__WEBPACK_IMPORTED_MODULE_0__.samePosition)(pebble, p));
+/** Pebbles that are about to come down. */
+const LOOSE_PEBBLE_STATES = ['wobble', 'falling'];
+/** Pebbles that have not fallen yet, including ones still resting on soil. */
+const UNFALLEN_PEBBLE_STATES = ['resting', 'wobble', 'falling'];
+/** Whether a pebble in one of `states` sits somewhere above `p`, in the same column. */
+const isBelowPebble = (store, p, states) => store.pebbles.some((pebble) => states.includes(pebble.state) && pebble.x === p.x && pebble.y < p.y);
+/** Beetles that take up their cell: awake ones, and ones dozing or dizzy before they head home. */
+const occupiesCell = (beetle) => beetle.state === 'awake' || beetle.state === 'asleep' || beetle.state === 'dizzy';
+const beetleAt = (store, p, except) => store.beetles.find((beetle) => beetle !== except && occupiesCell(beetle) && (0,_ai__WEBPACK_IMPORTED_MODULE_0__.samePosition)(beetle, p));
+const facingTowards = (from, to, current) => to.x > from.x ? 'right' : to.x < from.x ? 'left' : current;
+const addScore = (store, points) => {
+    if (points <= 0)
+        return;
+    store.score += points;
+    store.config.pointsIncreasedCallback(store.score);
+};
+
+
+/***/ }),
+
 /***/ "./src/burrow/core/constants.ts":
 /*!**************************************!*\
   !*** ./src/burrow/core/constants.ts ***!
@@ -3590,6 +3640,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   BURROW_BONK_POINTS: () => (/* binding */ BURROW_BONK_POINTS),
 /* harmony export */   BURROW_DEN: () => (/* binding */ BURROW_DEN),
 /* harmony export */   BURROW_DURATION_DIVISOR: () => (/* binding */ BURROW_DURATION_DIVISOR),
+/* harmony export */   BURROW_EMPTY_GRAPH_BEETLES: () => (/* binding */ BURROW_EMPTY_GRAPH_BEETLES),
 /* harmony export */   BURROW_END_HOLD_FRAMES: () => (/* binding */ BURROW_END_HOLD_FRAMES),
 /* harmony export */   BURROW_FIELD_RADIUS: () => (/* binding */ BURROW_FIELD_RADIUS),
 /* harmony export */   BURROW_FREEZE_FRAMES: () => (/* binding */ BURROW_FREEZE_FRAMES),
@@ -3609,10 +3660,13 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   BURROW_NAP_FRAMES: () => (/* binding */ BURROW_NAP_FRAMES),
 /* harmony export */   BURROW_PEBBLE_CRUMBLE_FRAMES: () => (/* binding */ BURROW_PEBBLE_CRUMBLE_FRAMES),
 /* harmony export */   BURROW_PEBBLE_DANGER_COST: () => (/* binding */ BURROW_PEBBLE_DANGER_COST),
+/* harmony export */   BURROW_PEBBLE_MIN_X: () => (/* binding */ BURROW_PEBBLE_MIN_X),
 /* harmony export */   BURROW_PEBBLE_SPACING: () => (/* binding */ BURROW_PEBBLE_SPACING),
 /* harmony export */   BURROW_PEBBLE_WOBBLE_FRAMES: () => (/* binding */ BURROW_PEBBLE_WOBBLE_FRAMES),
 /* harmony export */   BURROW_REGROW_FRAMES: () => (/* binding */ BURROW_REGROW_FRAMES),
 /* harmony export */   BURROW_SOIL_CLUMP: () => (/* binding */ BURROW_SOIL_CLUMP),
+/* harmony export */   BURROW_SOIL_PER_BEETLE: () => (/* binding */ BURROW_SOIL_PER_BEETLE),
+/* harmony export */   BURROW_SOIL_PER_PEBBLE: () => (/* binding */ BURROW_SOIL_PER_PEBBLE),
 /* harmony export */   BURROW_SWEEP_WIDTH: () => (/* binding */ BURROW_SWEEP_WIDTH),
 /* harmony export */   BURROW_WAKE_FRAMES: () => (/* binding */ BURROW_WAKE_FRAMES),
 /* harmony export */   CELL_SIZE: () => (/* reexport safe */ _shared_constants__WEBPACK_IMPORTED_MODULE_0__.CELL_SIZE),
@@ -3663,9 +3717,17 @@ const BURROW_BEETLE_PATIENCE = 8;
 const BURROW_BEETLE_CHASE_RANGE = 14;
 const BURROW_BEETLE_APPEAR_FRAME = 3;
 const BURROW_MAX_BEETLES = 4;
+/** One beetle, plus one more for every this many soil cells (up to BURROW_MAX_BEETLES). */
+const BURROW_SOIL_PER_BEETLE = 90;
+/** An empty graph has nothing to dig, so a couple of beetles still turn up to be sung to. */
+const BURROW_EMPTY_GRAPH_BEETLES = 2;
 /** Beetles start no closer to the den than this column. */
 const BURROW_BEETLE_MIN_X = 14;
 const BURROW_MAX_PEBBLES = 5;
+/** One pebble for every this many soil cells (up to BURROW_MAX_PEBBLES). */
+const BURROW_SOIL_PER_PEBBLE = 30;
+/** Pebbles stay clear of the first few columns, so the wombat is never greeted by one at the den. */
+const BURROW_PEBBLE_MIN_X = 2;
 /** Minimum number of columns between two pebbles. */
 const BURROW_PEBBLE_SPACING = 5;
 const BURROW_PEBBLE_WOBBLE_FRAMES = 3;
@@ -3692,15 +3754,16 @@ const BURROW_BONK_POINTS = 30;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Game: () => (/* binding */ Game),
-/* harmony export */   findHumTarget: () => (/* binding */ findHumTarget),
-/* harmony export */   planWombatPath: () => (/* binding */ planWombatPath),
 /* harmony export */   simulate: () => (/* binding */ simulate)
 /* harmony export */ });
 /* harmony import */ var _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../shared/utils/utils */ "./src/shared/utils/utils.ts");
-/* harmony import */ var _renderers_svg__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../renderers/svg */ "./src/burrow/renderers/svg.ts");
-/* harmony import */ var _ai__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./ai */ "./src/burrow/core/ai.ts");
-/* harmony import */ var _constants__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./constants */ "./src/burrow/core/constants.ts");
-/* harmony import */ var _random__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./random */ "./src/burrow/core/random.ts");
+/* harmony import */ var _entities_beetle__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../entities/beetle */ "./src/burrow/entities/beetle.ts");
+/* harmony import */ var _entities_pebble__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../entities/pebble */ "./src/burrow/entities/pebble.ts");
+/* harmony import */ var _entities_wombat__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../entities/wombat */ "./src/burrow/entities/wombat.ts");
+/* harmony import */ var _renderers_svg__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../renderers/svg */ "./src/burrow/renderers/svg.ts");
+/* harmony import */ var _board__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./board */ "./src/burrow/core/board.ts");
+/* harmony import */ var _constants__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./constants */ "./src/burrow/core/constants.ts");
+/* harmony import */ var _random__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./random */ "./src/burrow/core/random.ts");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -3715,82 +3778,17 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 
 
 
-/* ───────────────────────── Board queries ───────────────────────── */
-const cloneSoil = (soil) => soil.map((column) => [...column]);
-const soilAt = (store, p) => ((0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(p) ? store.soil[p.x][p.y] : 0);
-const isTunnel = (store, p) => (0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(p) && store.soil[p.x][p.y] === 0;
-const countSoil = (soil) => soil.reduce((sum, column) => sum + column.filter((h) => h > 0).length, 0);
-const isSolidPebble = (pebble) => pebble.state !== 'gone';
-const pebbleAt = (store, p) => store.pebbles.find((pebble) => isSolidPebble(pebble) && (0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(pebble, p));
-const isActiveBeetle = (beetle) => beetle.state === 'awake' || beetle.state === 'asleep' || beetle.state === 'dizzy';
-const beetleAt = (store, p, except) => store.beetles.find((beetle) => beetle !== except && isActiveBeetle(beetle) && (0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(beetle, p));
-const facingTowards = (from, to, current) => to.x > from.x ? 'right' : to.x < from.x ? 'left' : current;
-/** A cell under a pebble that is about to come down. */
-const isUnderLoosePebble = (store, p) => store.pebbles.some((pebble) => (pebble.state === 'wobble' || pebble.state === 'falling') && pebble.x === p.x && pebble.y < p.y);
-const isFinished = (store) => countSoil(store.soil) === 0 && store.pebbles.every((p) => p.state === 'gone') && store.beetles.every((b) => b.state === 'gone');
+
+
+
 /* ───────────────────────── Setup ───────────────────────── */
+/** Starting hardness of a day: its contribution level (1-4), or 0 for a day with no contributions. */
 const levelOf = (store, x, y) => {
     var _a;
     const cell = (_a = store.grid[x]) === null || _a === void 0 ? void 0 : _a[y];
     if (!cell || cell.commitsCount <= 0)
         return 0;
     return Math.max(1, _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__.Utils.levelToIndex(cell.level));
-};
-const shuffle = (items, random) => {
-    const result = [...items];
-    for (let i = result.length - 1; i > 0; i--) {
-        const j = Math.floor(random() * (i + 1));
-        [result[i], result[j]] = [result[j], result[i]];
-    }
-    return result;
-};
-/** Pebbles sit on the busiest days, always on top of soil so they only fall once the wombat digs underneath. */
-const placePebbles = (store, random) => {
-    const soilCells = countSoil(store.soil);
-    const limit = Math.min(_constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_PEBBLES, Math.floor(soilCells / 30));
-    const candidates = [];
-    for (let x = 2; x < _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_WIDTH; x++) {
-        for (let y = 0; y < _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_HEIGHT - 1; y++) {
-            if (store.soil[x][y] === 4 && store.soil[x][y + 1] > 0)
-                candidates.push({ x, y });
-        }
-    }
-    const pebbles = [];
-    for (const candidate of shuffle(candidates, random)) {
-        if (pebbles.length >= limit)
-            break;
-        if (pebbles.some((p) => Math.abs(p.x - candidate.x) < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_PEBBLE_SPACING))
-            continue;
-        pebbles.push(Object.assign(Object.assign({ id: pebbles.length }, candidate), { state: 'resting', timer: 0, level: store.soil[candidate.x][candidate.y], spawn: Object.assign({}, candidate) }));
-    }
-    for (const pebble of pebbles)
-        store.soil[pebble.x][pebble.y] = 0;
-    return pebbles.sort((a, b) => a.x - b.x).map((p, id) => (Object.assign(Object.assign({}, p), { id })));
-};
-/** Beetles start spread across the right of the graph, in open tunnels where possible. */
-const placeBeetles = (store, random) => {
-    const soilCells = countSoil(store.soil);
-    const count = soilCells === 0 ? 2 : Math.min(_constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_BEETLES, 1 + Math.floor(soilCells / 90));
-    const span = (_constants__WEBPACK_IMPORTED_MODULE_3__.GRID_WIDTH - _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_MIN_X) / count;
-    const beetles = [];
-    for (let i = 0; i < count; i++) {
-        const fromX = Math.floor(_constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_MIN_X + i * span);
-        const toX = Math.floor(_constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_MIN_X + (i + 1) * span);
-        const cells = [];
-        for (let x = fromX; x < toX; x++) {
-            for (let y = 0; y < _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_HEIGHT; y++) {
-                if (!pebbleAt(store, { x, y }))
-                    cells.push({ x, y });
-            }
-        }
-        const tunnels = cells.filter((p) => isTunnel(store, p));
-        const pool = tunnels.length > 0 ? tunnels : cells;
-        if (pool.length === 0)
-            continue;
-        const spot = pool[Math.floor(random() * pool.length)];
-        beetles.push(Object.assign(Object.assign({ id: i }, spot), { state: 'hidden', facing: 'left', drowsiness: 0, frozenFor: 0, lastHummedFrame: 0, moveCooldown: 0, stuckFrames: 0, timer: 0, spawn: Object.assign({}, spot) }));
-    }
-    return beetles;
 };
 const resetGameState = (store) => {
     store.frameCount = 0;
@@ -3799,300 +3797,53 @@ const resetGameState = (store) => {
     store.beetlesLulled = 0;
     store.beetlesBonked = 0;
     store.snapshots = [];
-    store.soil = Array.from({ length: _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_WIDTH }, (_, x) => Array.from({ length: _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_HEIGHT }, (_, y) => levelOf(store, x, y)));
-    const seed = store.contributions.reduce((sum, c) => sum + c.count, 0) * 31 + countSoil(store.soil);
-    const random = (0,_random__WEBPACK_IMPORTED_MODULE_4__.createRandom)(seed);
-    store.pebbles = placePebbles(store, random);
-    store.initialSoil = cloneSoil(store.soil);
-    store.beetles = placeBeetles(store, random);
-    store.wombat = Object.assign(Object.assign({}, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, humCooldown: 0, humHold: 0, humTarget: null, visible: true });
+    store.soil = Array.from({ length: _constants__WEBPACK_IMPORTED_MODULE_6__.GRID_WIDTH }, (_, x) => Array.from({ length: _constants__WEBPACK_IMPORTED_MODULE_6__.GRID_HEIGHT }, (_, y) => levelOf(store, x, y)));
+    // Seeded from the graph itself, so the same graph always plays the same game.
+    const seed = store.contributions.reduce((sum, c) => sum + c.count, 0) * 31 + (0,_board__WEBPACK_IMPORTED_MODULE_5__.countSoil)(store.soil);
+    const random = (0,_random__WEBPACK_IMPORTED_MODULE_7__.createRandom)(seed);
+    store.pebbles = (0,_entities_pebble__WEBPACK_IMPORTED_MODULE_2__.placePebbles)(store, random);
+    store.initialSoil = (0,_board__WEBPACK_IMPORTED_MODULE_5__.cloneSoil)(store.soil);
+    store.beetles = (0,_entities_beetle__WEBPACK_IMPORTED_MODULE_1__.placeBeetles)(store, random);
+    store.wombat = (0,_entities_wombat__WEBPACK_IMPORTED_MODULE_3__.createWombat)();
     pushSnapshot(store);
     return random;
 };
 const pushSnapshot = (store) => {
     store.snapshots.push({
-        soil: cloneSoil(store.soil),
+        soil: (0,_board__WEBPACK_IMPORTED_MODULE_5__.cloneSoil)(store.soil),
         wombat: Object.assign({}, store.wombat),
         beetles: store.beetles.map((b) => (Object.assign(Object.assign({}, b), { spawn: Object.assign({}, b.spawn) }))),
         pebbles: store.pebbles.map((p) => (Object.assign(Object.assign({}, p), { spawn: Object.assign({}, p.spawn) })))
     });
     store.frameCount = store.snapshots.length - 1;
 };
-const addScore = (store, points) => {
-    if (points <= 0)
-        return;
-    store.score += points;
-    store.config.pointsIncreasedCallback(store.score);
-};
-/* ───────────────────────── Wombat ───────────────────────── */
-/**
- * The first awake beetle the wombat's humming can reach: in a straight line, at most BURROW_HUM_RANGE cells away,
- * with only open tunnel in between. The tune does not carry through soil, except right up close.
- */
-const findHumTarget = (store) => {
-    const { wombat } = store;
-    for (const { x: dx, y: dy } of [
-        { x: wombat.facing === 'right' ? 1 : -1, y: 0 },
-        { x: wombat.facing === 'right' ? -1 : 1, y: 0 },
-        { x: 0, y: -1 },
-        { x: 0, y: 1 }
-    ]) {
-        for (let distance = 1; distance <= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_HUM_RANGE; distance++) {
-            const p = { x: wombat.x + dx * distance, y: wombat.y + dy * distance };
-            if (!(0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(p) || pebbleAt(store, p))
-                break;
-            const beetle = beetleAt(store, p);
-            if (beetle) {
-                if (beetle.state === 'awake' && (distance === 1 || isTunnel(store, p)))
-                    return beetle;
-                break;
-            }
-            if (!isTunnel(store, p))
-                break;
-        }
-    }
-    return null;
-};
-/** The wombat closes its eyes and hums; a note sets off towards the beetle, which stops to listen. */
-const startHumming = (store, beetle) => {
-    const { wombat } = store;
-    wombat.pose = 'hum';
-    wombat.facing = facingTowards(wombat, beetle, wombat.facing);
-    wombat.digPhase = 0;
-    wombat.humTarget = beetle.id;
-    wombat.humHold = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_HUM_FRAMES - 1;
-    // The cooldown only starts counting once the note has landed.
-    wombat.humCooldown = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_HUM_COOLDOWN + 1;
-    beetle.frozenFor = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_FREEZE_FRAMES;
-};
-/** The note reaches the beetle, which gets a little sleepier. */
-const landNote = (store, frame) => {
-    const beetle = store.beetles.find((b) => b.id === store.wombat.humTarget);
-    if (!beetle || beetle.state !== 'awake')
-        return;
-    beetle.drowsiness++;
-    beetle.frozenFor = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_FREEZE_FRAMES;
-    beetle.lastHummedFrame = frame;
-    if (beetle.drowsiness >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LULL_HITS) {
-        beetle.state = 'asleep';
-        beetle.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_NAP_FRAMES;
-        store.beetlesLulled++;
-        addScore(store, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LULL_POINTS);
-    }
-};
-const wombatStepCost = (store, p) => {
-    if (pebbleAt(store, p) || beetleAt(store, p))
-        return null;
-    const danger = isUnderLoosePebble(store, p) ? _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_PEBBLE_DANGER_COST : 0;
-    return 1 + store.soil[p.x][p.y] + danger;
-};
-/** Leftmost column that still has soil in it. */
-const soilFrontier = (store) => store.soil.findIndex((column) => column.some((h) => h > 0));
-/** A cell somewhere below a pebble that has yet to fall. A pebble never falls onto the wombat, so standing here stalls it. */
-const isUnderPebble = (store, p) => store.pebbles.some((pebble) => pebble.state !== 'gone' && pebble.state !== 'crumble' && pebble.x === p.x && pebble.y < p.y);
-/**
- * Where the wombat heads next: the cheapest soil near the left edge of what is left (so it works through the
- * graph from left to right instead of leaving dense days behind), any soil if that is blocked, or, once the soil
- * is gone, out from under any pebble still waiting to drop, then the nearest awake beetle.
- */
-const planWombatPath = (store) => {
-    var _a;
-    const { wombat } = store;
-    const frontier = soilFrontier(store);
-    if (frontier >= 0) {
-        const stepCost = (p) => wombatStepCost(store, p);
-        const isSoil = (p) => store.soil[p.x][p.y] > 0;
-        return ((_a = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, stepCost, (p) => isSoil(p) && p.x <= frontier + _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_SWEEP_WIDTH)) !== null && _a !== void 0 ? _a : (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, stepCost, isSoil));
-    }
-    if (isUnderPebble(store, wombat)) {
-        return (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, (p) => wombatStepCost(store, p), (p) => !isUnderPebble(store, p));
-    }
-    if (!store.beetles.some((b) => b.state === 'awake'))
-        return null;
-    return (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, (p) => {
-        const beetle = beetleAt(store, p);
-        if (beetle)
-            return beetle.state === 'awake' ? 1 : null;
-        return wombatStepCost(store, p);
-    }, (p) => { var _a; return ((_a = beetleAt(store, p)) === null || _a === void 0 ? void 0 : _a.state) === 'awake'; });
-};
-/** Returns true when the wombat dug or sang this frame. */
-const moveWombat = (store, frame) => {
-    var _a, _b;
-    const { wombat } = store;
-    if (wombat.humHold > 0) {
-        wombat.humHold--;
-        wombat.digPhase = 1 - wombat.digPhase;
-        if (wombat.humHold === 0)
-            landNote(store, frame);
-        return true;
-    }
-    wombat.humCooldown = Math.max(0, wombat.humCooldown - 1);
-    wombat.pose = 'walk';
-    wombat.humTarget = null;
-    const beetle = findHumTarget(store);
-    if (beetle && wombat.humCooldown === 0) {
-        startHumming(store, beetle);
-        return true;
-    }
-    // Mid-lullaby: wait for the next note rather than wandering out of earshot.
-    if (beetle && beetle.drowsiness > 0) {
-        wombat.facing = facingTowards(wombat, beetle, wombat.facing);
-        return true;
-    }
-    const next = (_a = planWombatPath(store)) === null || _a === void 0 ? void 0 : _a[0];
-    if (!next)
-        return false;
-    wombat.facing = facingTowards(wombat, next, wombat.facing);
-    const occupied = () => !!beetleAt(store, next) || !!pebbleAt(store, next);
-    if (soilAt(store, next) === 0) {
-        if (!occupied())
-            Object.assign(wombat, { x: next.x, y: next.y });
-        return false;
-    }
-    // Scrape one layer off; the last scrape opens the cell and the wombat shuffles in.
-    wombat.pose = 'dig';
-    wombat.digPhase = 1 - wombat.digPhase;
-    store.soil[next.x][next.y]--;
-    if (store.soil[next.x][next.y] === 0) {
-        store.cellsDug++;
-        addScore(store, (_b = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LEVEL_POINTS[store.initialSoil[next.x][next.y]]) !== null && _b !== void 0 ? _b : 1);
-        if (!occupied())
-            Object.assign(wombat, { x: next.x, y: next.y });
-    }
-    return true;
-};
-/* ───────────────────────── Pebbles ───────────────────────── */
-/** Returns true when any pebble moved or changed state. */
-const updatePebbles = (store) => {
-    var _a;
-    let changed = false;
-    for (const pebble of store.pebbles) {
-        const below = { x: pebble.x, y: pebble.y + 1 };
-        const canDrop = () => (0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(below) && isTunnel(store, below) && !pebbleAt(store, below) && !(0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(store.wombat, below);
-        switch (pebble.state) {
-            case 'resting':
-                if (canDrop()) {
-                    pebble.state = 'wobble';
-                    pebble.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_PEBBLE_WOBBLE_FRAMES;
-                    changed = true;
-                }
-                break;
-            case 'wobble':
-                if (--pebble.timer <= 0)
-                    pebble.state = 'falling';
-                changed = true;
-                break;
-            case 'falling':
-                if (canDrop()) {
-                    pebble.y++;
-                    for (const beetle of store.beetles) {
-                        if (beetle.state === 'awake' && (0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(beetle, pebble)) {
-                            beetle.state = 'dizzy';
-                            beetle.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_NAP_FRAMES;
-                            store.beetlesBonked++;
-                            addScore(store, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BONK_POINTS);
-                        }
-                    }
-                }
-                else {
-                    pebble.state = 'crumble';
-                    pebble.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_PEBBLE_CRUMBLE_FRAMES;
-                }
-                changed = true;
-                break;
-            case 'crumble':
-                if (--pebble.timer <= 0) {
-                    pebble.state = 'gone';
-                    store.cellsDug++;
-                    addScore(store, (_a = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LEVEL_POINTS[pebble.level]) !== null && _a !== void 0 ? _a : 1);
-                }
-                changed = true;
-                break;
-        }
-    }
-    return changed;
-};
-/* ───────────────────────── Beetles ───────────────────────── */
-const pickBeetleStep = (store, beetle, random) => {
-    var _a, _b;
-    const { wombat } = store;
-    const free = (p) => !(0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(p, wombat) && !pebbleAt(store, p) && !beetleAt(store, p, beetle);
-    const nextToWombat = (p) => (0,_ai__WEBPACK_IMPORTED_MODULE_2__.manhattan)(p, wombat) === 1;
-    const tunnelSteps = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.getNeighbors)(beetle).filter((p) => isTunnel(store, p) && free(p));
-    const amble = () => (tunnelSteps.length > 0 ? tunnelSteps[Math.floor(random() * tunnelSteps.length)] : null);
-    const tunnelPath = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findShortestPath)(beetle, (p) => isTunnel(store, p) && free(p), nextToWombat);
-    if (tunnelPath) {
-        beetle.stuckFrames = 0;
-        if (tunnelPath.length === 0)
-            return null; // already nibbling at the wombat's heels
-        if (tunnelPath.length <= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_CHASE_RANGE || random() < 0.5)
-            return tunnelPath[0];
-        return amble();
-    }
-    // No tunnel leads to the wombat: amble for a while, then squeeze through the soil.
-    if (++beetle.stuckFrames < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_PATIENCE && tunnelSteps.length > 0)
-        return amble();
-    if (nextToWombat(beetle))
-        return null;
-    return (_b = (_a = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findShortestPath)(beetle, free, nextToWombat)) === null || _a === void 0 ? void 0 : _a[0]) !== null && _b !== void 0 ? _b : null;
-};
-const updateBeetles = (store, frame, random) => {
-    for (const beetle of store.beetles) {
-        if (beetle.state === 'hidden' && frame >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_APPEAR_FRAME)
-            beetle.state = 'awake';
-        if (beetle.state === 'asleep' || beetle.state === 'dizzy') {
-            if (--beetle.timer <= 0)
-                beetle.state = 'gone';
-            continue;
-        }
-        if (beetle.state !== 'awake')
-            continue;
-        if (beetle.drowsiness > 0 && frame - beetle.lastHummedFrame >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_WAKE_FRAMES) {
-            beetle.drowsiness--;
-            beetle.lastHummedFrame = frame;
-        }
-        if (beetle.frozenFor > 0) {
-            beetle.frozenFor--;
-            continue;
-        }
-        if (beetle.moveCooldown > 0) {
-            beetle.moveCooldown--;
-            continue;
-        }
-        const step = pickBeetleStep(store, beetle, random);
-        if (!step)
-            continue;
-        beetle.facing = facingTowards(beetle, step, beetle.facing);
-        beetle.x = step.x;
-        beetle.y = step.y;
-        beetle.moveCooldown = (isTunnel(store, step) ? _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_TUNNEL_STEP : _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_SOIL_STEP) - 1;
-    }
-};
+const isFinished = (store) => (0,_board__WEBPACK_IMPORTED_MODULE_5__.countSoil)(store.soil) === 0 && store.pebbles.every((p) => p.state === 'gone') && store.beetles.every((b) => b.state === 'gone');
 /* ───────────────────────── Ending ───────────────────────── */
 /**
  * The wombat naps, then the soil regrows from left to right and everything returns to where it started,
  * so the last frame matches the first and the animation loops seamlessly.
  */
 const playEnding = (store) => {
+    // Any beetle still out (the game hit its frame cap) heads home.
     for (const beetle of store.beetles)
-        beetle.state = beetle.state === 'hidden' ? 'hidden' : 'gone';
+        if (beetle.state !== 'hidden')
+            beetle.state = 'gone';
     store.wombat.pose = 'sleep';
-    for (let i = 0; i < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_NAP_END_FRAMES; i++)
+    for (let i = 0; i < _constants__WEBPACK_IMPORTED_MODULE_6__.BURROW_NAP_END_FRAMES; i++)
         pushSnapshot(store);
     // Hide everything first and move it back a frame later, so nothing visibly slides across the board.
     store.wombat.visible = false;
     for (const pebble of store.pebbles)
         pebble.state = 'gone';
     pushSnapshot(store);
-    Object.assign(store.wombat, Object.assign(Object.assign({}, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, humCooldown: 0, humHold: 0, humTarget: null }));
+    store.wombat = Object.assign(Object.assign({}, (0,_entities_wombat__WEBPACK_IMPORTED_MODULE_3__.createWombat)()), { visible: false });
     for (const beetle of store.beetles)
         Object.assign(beetle, Object.assign(Object.assign({}, beetle.spawn), { state: 'hidden', facing: 'left', drowsiness: 0 }));
     for (const pebble of store.pebbles)
         Object.assign(pebble, Object.assign(Object.assign({}, pebble.spawn), { timer: 0 }));
     pushSnapshot(store);
-    for (let step = 1; step <= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_REGROW_FRAMES; step++) {
-        const upTo = Math.ceil((step / _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_REGROW_FRAMES) * _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_WIDTH);
+    for (let step = 1; step <= _constants__WEBPACK_IMPORTED_MODULE_6__.BURROW_REGROW_FRAMES; step++) {
+        const upTo = Math.ceil((step / _constants__WEBPACK_IMPORTED_MODULE_6__.BURROW_REGROW_FRAMES) * _constants__WEBPACK_IMPORTED_MODULE_6__.GRID_WIDTH);
         for (let x = 0; x < upTo; x++)
             store.soil[x] = [...store.initialSoil[x]];
         for (const pebble of store.pebbles)
@@ -4100,28 +3851,29 @@ const playEnding = (store) => {
                 pebble.state = 'resting';
         pushSnapshot(store);
     }
-    for (let i = 0; i < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_END_HOLD_FRAMES; i++)
+    for (let i = 0; i < _constants__WEBPACK_IMPORTED_MODULE_6__.BURROW_END_HOLD_FRAMES; i++)
         pushSnapshot(store);
 };
 /* ───────────────────────── Main loop ───────────────────────── */
 /** Simulates the whole game into `store.snapshots`, without rendering. */
 const simulate = (store) => {
     const random = resetGameState(store);
-    const maxFrames = store.config.maxFrames ? Math.min(store.config.maxFrames, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_FRAMES) : _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_FRAMES;
+    const maxFrames = store.config.maxFrames ? Math.min(store.config.maxFrames, _constants__WEBPACK_IMPORTED_MODULE_6__.BURROW_MAX_FRAMES) : _constants__WEBPACK_IMPORTED_MODULE_6__.BURROW_MAX_FRAMES;
+    // Stop early if nothing gets dug or sung for a long stretch, so a stuck game can never run to the cap.
     let idleFrames = 0;
-    while (!isFinished(store) && store.snapshots.length < maxFrames && idleFrames < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_IDLE_FRAMES) {
+    while (!isFinished(store) && store.snapshots.length < maxFrames && idleFrames < _constants__WEBPACK_IMPORTED_MODULE_6__.BURROW_MAX_IDLE_FRAMES) {
         const frame = store.snapshots.length;
-        const progressed = moveWombat(store, frame);
-        const pebblesMoved = updatePebbles(store);
-        updateBeetles(store, frame, random);
+        const wombatBusy = (0,_entities_wombat__WEBPACK_IMPORTED_MODULE_3__.moveWombat)(store, frame);
+        const pebblesMoved = (0,_entities_pebble__WEBPACK_IMPORTED_MODULE_2__.updatePebbles)(store);
+        (0,_entities_beetle__WEBPACK_IMPORTED_MODULE_1__.updateBeetles)(store, frame, random);
         pushSnapshot(store);
-        idleFrames = progressed || pebblesMoved ? 0 : idleFrames + 1;
+        idleFrames = wombatBusy || pebblesMoved ? 0 : idleFrames + 1;
     }
     playEnding(store);
 };
 const startGame = (store) => __awaiter(void 0, void 0, void 0, function* () {
     simulate(store);
-    const svg = _renderers_svg__WEBPACK_IMPORTED_MODULE_1__.Renderer.generateAnimatedSVG(store);
+    const svg = _renderers_svg__WEBPACK_IMPORTED_MODULE_4__.Renderer.generateAnimatedSVG(store);
     store.config.svgCallback(svg);
     if (store.config.gameStatsCallback) {
         store.config.gameStatsCallback({
@@ -4151,7 +3903,8 @@ const Game = {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   createRandom: () => (/* binding */ createRandom)
+/* harmony export */   createRandom: () => (/* binding */ createRandom),
+/* harmony export */   shuffle: () => (/* binding */ shuffle)
 /* harmony export */ });
 /** Small deterministic PRNG (mulberry32) so the same contribution graph always plays the same game. */
 const createRandom = (seed) => {
@@ -4163,6 +3916,15 @@ const createRandom = (seed) => {
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+};
+/** A shuffled copy of `items` (Fisher–Yates), driven by `random` so it is repeatable. */
+const shuffle = (items, random) => {
+    const result = [...items];
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
 };
 
 
@@ -4178,6 +3940,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Store: () => (/* binding */ Store)
 /* harmony export */ });
+/* harmony import */ var _entities_wombat__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../entities/wombat */ "./src/burrow/entities/wombat.ts");
+
 const Store = {
     contributions: [],
     grid: [],
@@ -4187,17 +3951,7 @@ const Store = {
     frameCount: 0,
     soil: [],
     initialSoil: [],
-    wombat: {
-        x: -1,
-        y: 3,
-        facing: 'right',
-        pose: 'walk',
-        digPhase: 0,
-        humCooldown: 0,
-        humHold: 0,
-        humTarget: null,
-        visible: true
-    },
+    wombat: (0,_entities_wombat__WEBPACK_IMPORTED_MODULE_0__.createWombat)(),
     beetles: [],
     pebbles: [],
     snapshots: [],
@@ -4205,6 +3959,388 @@ const Store = {
     cellsDug: 0,
     beetlesLulled: 0,
     beetlesBonked: 0
+};
+
+
+/***/ }),
+
+/***/ "./src/burrow/entities/beetle.ts":
+/*!***************************************!*\
+  !*** ./src/burrow/entities/beetle.ts ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   placeBeetles: () => (/* binding */ placeBeetles),
+/* harmony export */   updateBeetles: () => (/* binding */ updateBeetles)
+/* harmony export */ });
+/* harmony import */ var _core_board__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../core/board */ "./src/burrow/core/board.ts");
+/* harmony import */ var _core_ai__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/ai */ "./src/burrow/core/ai.ts");
+/* harmony import */ var _core_constants__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../core/constants */ "./src/burrow/core/constants.ts");
+
+
+
+/** Beetles start spread across the right of the graph, in open tunnels where possible. */
+const placeBeetles = (store, random) => {
+    const soilCells = (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.countSoil)(store.soil);
+    const count = soilCells === 0 ? _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_EMPTY_GRAPH_BEETLES : Math.min(_core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_MAX_BEETLES, 1 + Math.floor(soilCells / _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_SOIL_PER_BEETLE));
+    const span = (_core_constants__WEBPACK_IMPORTED_MODULE_2__.GRID_WIDTH - _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BEETLE_MIN_X) / count;
+    const beetles = [];
+    for (let i = 0; i < count; i++) {
+        const fromX = Math.floor(_core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BEETLE_MIN_X + i * span);
+        const toX = Math.floor(_core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BEETLE_MIN_X + (i + 1) * span);
+        const cells = [];
+        for (let x = fromX; x < toX; x++) {
+            for (let y = 0; y < _core_constants__WEBPACK_IMPORTED_MODULE_2__.GRID_HEIGHT; y++) {
+                if (!(0,_core_board__WEBPACK_IMPORTED_MODULE_0__.pebbleAt)(store, { x, y }))
+                    cells.push({ x, y });
+            }
+        }
+        const tunnels = cells.filter((p) => (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isTunnel)(store, p));
+        const pool = tunnels.length > 0 ? tunnels : cells;
+        if (pool.length === 0)
+            continue;
+        const spot = pool[Math.floor(random() * pool.length)];
+        beetles.push(Object.assign(Object.assign({ id: i }, spot), { state: 'hidden', facing: 'left', drowsiness: 0, frozenFor: 0, lastHummedFrame: 0, moveCooldown: 0, stuckFrames: 0, timer: 0, spawn: Object.assign({}, spot) }));
+    }
+    return beetles;
+};
+/**
+ * Where a beetle steps next. Close by, it chases the wombat through the tunnels; far away it half chases,
+ * half ambles. With no tunnel leading to the wombat it ambles for a while, then squeezes through the soil.
+ */
+const pickBeetleStep = (store, beetle, random) => {
+    var _a, _b;
+    const { wombat } = store;
+    const free = (p) => !(0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.samePosition)(p, wombat) && !(0,_core_board__WEBPACK_IMPORTED_MODULE_0__.pebbleAt)(store, p) && !(0,_core_board__WEBPACK_IMPORTED_MODULE_0__.beetleAt)(store, p, beetle);
+    const nextToWombat = (p) => (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.manhattan)(p, wombat) === 1;
+    const tunnelSteps = (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.getNeighbors)(beetle).filter((p) => (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isTunnel)(store, p) && free(p));
+    const amble = () => (tunnelSteps.length > 0 ? tunnelSteps[Math.floor(random() * tunnelSteps.length)] : null);
+    const tunnelPath = (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.findShortestPath)(beetle, (p) => (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isTunnel)(store, p) && free(p), nextToWombat);
+    if (tunnelPath) {
+        beetle.stuckFrames = 0;
+        if (tunnelPath.length === 0)
+            return null; // already nibbling at the wombat's heels
+        if (tunnelPath.length <= _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BEETLE_CHASE_RANGE || random() < 0.5)
+            return tunnelPath[0];
+        return amble();
+    }
+    if (++beetle.stuckFrames < _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BEETLE_PATIENCE && tunnelSteps.length > 0)
+        return amble();
+    if (nextToWombat(beetle))
+        return null;
+    return (_b = (_a = (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.findShortestPath)(beetle, free, nextToWombat)) === null || _a === void 0 ? void 0 : _a[0]) !== null && _b !== void 0 ? _b : null;
+};
+/**
+ * Advances every beetle by one frame: peeking out, dozing or wobbling off home, drowsiness wearing off, and
+ * stepping (more slowly through soil than through tunnels) unless it is stopped to listen to the wombat.
+ */
+const updateBeetles = (store, frame, random) => {
+    for (const beetle of store.beetles) {
+        if (beetle.state === 'hidden' && frame >= _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BEETLE_APPEAR_FRAME)
+            beetle.state = 'awake';
+        if (beetle.state === 'asleep' || beetle.state === 'dizzy') {
+            if (--beetle.timer <= 0)
+                beetle.state = 'gone';
+            continue;
+        }
+        if (beetle.state !== 'awake')
+            continue;
+        if (beetle.drowsiness > 0 && frame - beetle.lastHummedFrame >= _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_WAKE_FRAMES) {
+            beetle.drowsiness--;
+            beetle.lastHummedFrame = frame;
+        }
+        if (beetle.frozenFor > 0) {
+            beetle.frozenFor--;
+            continue;
+        }
+        if (beetle.moveCooldown > 0) {
+            beetle.moveCooldown--;
+            continue;
+        }
+        const step = pickBeetleStep(store, beetle, random);
+        if (!step)
+            continue;
+        beetle.facing = (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.facingTowards)(beetle, step, beetle.facing);
+        beetle.x = step.x;
+        beetle.y = step.y;
+        beetle.moveCooldown = ((0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isTunnel)(store, step) ? _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BEETLE_TUNNEL_STEP : _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BEETLE_SOIL_STEP) - 1;
+    }
+};
+
+
+/***/ }),
+
+/***/ "./src/burrow/entities/pebble.ts":
+/*!***************************************!*\
+  !*** ./src/burrow/entities/pebble.ts ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   placePebbles: () => (/* binding */ placePebbles),
+/* harmony export */   updatePebbles: () => (/* binding */ updatePebbles)
+/* harmony export */ });
+/* harmony import */ var _core_board__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../core/board */ "./src/burrow/core/board.ts");
+/* harmony import */ var _core_ai__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/ai */ "./src/burrow/core/ai.ts");
+/* harmony import */ var _core_constants__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../core/constants */ "./src/burrow/core/constants.ts");
+/* harmony import */ var _core_random__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../core/random */ "./src/burrow/core/random.ts");
+
+
+
+
+/**
+ * Pebbles sit on the busiest days, always on top of soil so they only fall once the wombat digs underneath.
+ * The cell a pebble sits on becomes open tunnel; the pebble itself is scored when it crumbles away.
+ */
+const placePebbles = (store, random) => {
+    const limit = Math.min(_core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_MAX_PEBBLES, Math.floor((0,_core_board__WEBPACK_IMPORTED_MODULE_0__.countSoil)(store.soil) / _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_SOIL_PER_PEBBLE));
+    const candidates = [];
+    for (let x = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_PEBBLE_MIN_X; x < _core_constants__WEBPACK_IMPORTED_MODULE_2__.GRID_WIDTH; x++) {
+        for (let y = 0; y < _core_constants__WEBPACK_IMPORTED_MODULE_2__.GRID_HEIGHT - 1; y++) {
+            if (store.soil[x][y] === 4 && store.soil[x][y + 1] > 0)
+                candidates.push({ x, y });
+        }
+    }
+    const chosen = [];
+    for (const candidate of (0,_core_random__WEBPACK_IMPORTED_MODULE_3__.shuffle)(candidates, random)) {
+        if (chosen.length >= limit)
+            break;
+        if (chosen.some((p) => Math.abs(p.x - candidate.x) < _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_PEBBLE_SPACING))
+            continue;
+        chosen.push(candidate);
+    }
+    const pebbles = chosen
+        .sort((a, b) => a.x - b.x)
+        .map((p, id) => (Object.assign(Object.assign({ id }, p), { state: 'resting', timer: 0, level: store.soil[p.x][p.y], spawn: Object.assign({}, p) })));
+    for (const pebble of pebbles)
+        store.soil[pebble.x][pebble.y] = 0;
+    return pebbles;
+};
+/** A falling pebble bonks any awake beetle it lands on; the beetle wobbles off home. */
+const bonkBeetles = (store, pebble) => {
+    for (const beetle of store.beetles) {
+        if (beetle.state !== 'awake' || !(0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.samePosition)(beetle, pebble))
+            continue;
+        beetle.state = 'dizzy';
+        beetle.timer = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_NAP_FRAMES;
+        store.beetlesBonked++;
+        (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.addScore)(store, _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_BONK_POINTS);
+    }
+};
+/**
+ * Advances every pebble by one frame: a pebble wobbles once the cell under it is open (and the wombat is not
+ * standing there), falls one cell per frame, then crumbles away where it lands. Returns true when any pebble
+ * moved or changed state.
+ */
+const updatePebbles = (store) => {
+    var _a;
+    let changed = false;
+    for (const pebble of store.pebbles) {
+        const below = { x: pebble.x, y: pebble.y + 1 };
+        const canDrop = () => (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.inBounds)(below) && (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isTunnel)(store, below) && !(0,_core_board__WEBPACK_IMPORTED_MODULE_0__.pebbleAt)(store, below) && !(0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.samePosition)(store.wombat, below);
+        switch (pebble.state) {
+            case 'resting':
+                if (canDrop()) {
+                    pebble.state = 'wobble';
+                    pebble.timer = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_PEBBLE_WOBBLE_FRAMES;
+                    changed = true;
+                }
+                break;
+            case 'wobble':
+                if (--pebble.timer <= 0)
+                    pebble.state = 'falling';
+                changed = true;
+                break;
+            case 'falling':
+                if (canDrop()) {
+                    pebble.y++;
+                    bonkBeetles(store, pebble);
+                }
+                else {
+                    pebble.state = 'crumble';
+                    pebble.timer = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_PEBBLE_CRUMBLE_FRAMES;
+                }
+                changed = true;
+                break;
+            case 'crumble':
+                if (--pebble.timer <= 0) {
+                    pebble.state = 'gone';
+                    store.cellsDug++;
+                    (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.addScore)(store, (_a = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_LEVEL_POINTS[pebble.level]) !== null && _a !== void 0 ? _a : 1);
+                }
+                changed = true;
+                break;
+        }
+    }
+    return changed;
+};
+
+
+/***/ }),
+
+/***/ "./src/burrow/entities/wombat.ts":
+/*!***************************************!*\
+  !*** ./src/burrow/entities/wombat.ts ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   createWombat: () => (/* binding */ createWombat),
+/* harmony export */   findHumTarget: () => (/* binding */ findHumTarget),
+/* harmony export */   moveWombat: () => (/* binding */ moveWombat),
+/* harmony export */   planWombatPath: () => (/* binding */ planWombatPath)
+/* harmony export */ });
+/* harmony import */ var _core_board__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../core/board */ "./src/burrow/core/board.ts");
+/* harmony import */ var _core_ai__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/ai */ "./src/burrow/core/ai.ts");
+/* harmony import */ var _core_constants__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../core/constants */ "./src/burrow/core/constants.ts");
+
+
+
+/** The wombat as it starts out: in its den just off the left edge, facing the graph. */
+const createWombat = () => (Object.assign(Object.assign({}, _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, humCooldown: 0, humHold: 0, humTarget: null, visible: true }));
+/* ───────────────────────── Humming ───────────────────────── */
+/**
+ * The first awake beetle the wombat's humming can reach: in a straight line, at most BURROW_HUM_RANGE cells away,
+ * with only open tunnel in between. The tune does not carry through soil, except right up close.
+ */
+const findHumTarget = (store) => {
+    const { wombat } = store;
+    const ahead = wombat.facing === 'right' ? 1 : -1;
+    const directions = [
+        { x: ahead, y: 0 },
+        { x: -ahead, y: 0 },
+        { x: 0, y: -1 },
+        { x: 0, y: 1 }
+    ];
+    for (const { x: dx, y: dy } of directions) {
+        for (let distance = 1; distance <= _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_HUM_RANGE; distance++) {
+            const p = { x: wombat.x + dx * distance, y: wombat.y + dy * distance };
+            if (!(0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.inBounds)(p) || (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.pebbleAt)(store, p))
+                break;
+            const beetle = (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.beetleAt)(store, p);
+            if (beetle) {
+                if (beetle.state === 'awake' && (distance === 1 || (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isTunnel)(store, p)))
+                    return beetle;
+                break;
+            }
+            if (!(0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isTunnel)(store, p))
+                break;
+        }
+    }
+    return null;
+};
+/** The wombat closes its eyes and hums; a note sets off towards the beetle, which stops to listen. */
+const startHumming = (store, beetle) => {
+    const { wombat } = store;
+    wombat.pose = 'hum';
+    wombat.facing = (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.facingTowards)(wombat, beetle, wombat.facing);
+    wombat.humTarget = beetle.id;
+    wombat.humHold = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_HUM_FRAMES - 1;
+    // The cooldown only starts counting once the note has landed.
+    wombat.humCooldown = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_HUM_COOLDOWN + 1;
+    beetle.frozenFor = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_FREEZE_FRAMES;
+};
+/** The note reaches the beetle, which gets a little sleepier. */
+const landNote = (store, frame) => {
+    const beetle = store.beetles.find((b) => b.id === store.wombat.humTarget);
+    if (!beetle || beetle.state !== 'awake')
+        return;
+    beetle.drowsiness++;
+    beetle.frozenFor = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_FREEZE_FRAMES;
+    beetle.lastHummedFrame = frame;
+    if (beetle.drowsiness >= _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_LULL_HITS) {
+        beetle.state = 'asleep';
+        beetle.timer = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_NAP_FRAMES;
+        store.beetlesLulled++;
+        (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.addScore)(store, _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_LULL_POINTS);
+    }
+};
+/* ───────────────────────── Getting around ───────────────────────── */
+/** Cost of entering a cell: more for harder soil, a lot more under a pebble that is about to drop. */
+const stepCost = (store, p) => {
+    if ((0,_core_board__WEBPACK_IMPORTED_MODULE_0__.pebbleAt)(store, p) || (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.beetleAt)(store, p))
+        return null;
+    const danger = (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isBelowPebble)(store, p, _core_board__WEBPACK_IMPORTED_MODULE_0__.LOOSE_PEBBLE_STATES) ? _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_PEBBLE_DANGER_COST : 0;
+    return 1 + store.soil[p.x][p.y] + danger;
+};
+/** Leftmost column that still has soil in it, or -1 once it is all dug. */
+const soilFrontier = (store) => store.soil.findIndex((column) => column.some((h) => h > 0));
+/**
+ * Where the wombat heads next:
+ * 1. the cheapest soil near the left edge of what is left, so it works through the graph from left to right
+ *    instead of leaving dense days behind (or any soil, if that is blocked);
+ * 2. once the soil is gone, out from under any pebble still waiting to drop: a pebble never falls onto the
+ *    wombat, so standing underneath would stall it;
+ * 3. then towards the nearest awake beetle.
+ */
+const planWombatPath = (store) => {
+    var _a;
+    const { wombat } = store;
+    const cost = (p) => stepCost(store, p);
+    const frontier = soilFrontier(store);
+    if (frontier >= 0) {
+        const isSoil = (p) => store.soil[p.x][p.y] > 0;
+        return ((_a = (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.findCheapestPath)(wombat, cost, (p) => isSoil(p) && p.x <= frontier + _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_SWEEP_WIDTH)) !== null && _a !== void 0 ? _a : (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.findCheapestPath)(wombat, cost, isSoil));
+    }
+    if ((0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isBelowPebble)(store, wombat, _core_board__WEBPACK_IMPORTED_MODULE_0__.UNFALLEN_PEBBLE_STATES)) {
+        return (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.findCheapestPath)(wombat, cost, (p) => !(0,_core_board__WEBPACK_IMPORTED_MODULE_0__.isBelowPebble)(store, p, _core_board__WEBPACK_IMPORTED_MODULE_0__.UNFALLEN_PEBBLE_STATES));
+    }
+    if (!store.beetles.some((b) => b.state === 'awake'))
+        return null;
+    const isAwakeBeetle = (p) => { var _a; return ((_a = (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.beetleAt)(store, p)) === null || _a === void 0 ? void 0 : _a.state) === 'awake'; };
+    return (0,_core_ai__WEBPACK_IMPORTED_MODULE_1__.findCheapestPath)(wombat, (p) => (isAwakeBeetle(p) ? 1 : cost(p)), isAwakeBeetle);
+};
+/* ───────────────────────── One frame ───────────────────────── */
+/**
+ * Advances the wombat by one frame: it finishes humming a note, hums at a beetle in earshot (waiting between
+ * notes rather than wandering off), or moves along its path, scraping one layer off any soil in the way.
+ * Returns true when it dug or sang.
+ */
+const moveWombat = (store, frame) => {
+    var _a, _b;
+    const { wombat } = store;
+    if (wombat.humHold > 0) {
+        if (--wombat.humHold === 0)
+            landNote(store, frame);
+        return true;
+    }
+    wombat.humCooldown = Math.max(0, wombat.humCooldown - 1);
+    wombat.pose = 'walk';
+    wombat.humTarget = null;
+    const beetle = findHumTarget(store);
+    if (beetle && wombat.humCooldown === 0) {
+        startHumming(store, beetle);
+        return true;
+    }
+    if (beetle && beetle.drowsiness > 0) {
+        wombat.facing = (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.facingTowards)(wombat, beetle, wombat.facing);
+        return true;
+    }
+    const next = (_a = planWombatPath(store)) === null || _a === void 0 ? void 0 : _a[0];
+    if (!next)
+        return false;
+    wombat.facing = (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.facingTowards)(wombat, next, wombat.facing);
+    const occupied = () => !!(0,_core_board__WEBPACK_IMPORTED_MODULE_0__.beetleAt)(store, next) || !!(0,_core_board__WEBPACK_IMPORTED_MODULE_0__.pebbleAt)(store, next);
+    if ((0,_core_board__WEBPACK_IMPORTED_MODULE_0__.soilAt)(store, next) === 0) {
+        if (!occupied())
+            Object.assign(wombat, { x: next.x, y: next.y });
+        return false;
+    }
+    // Scrape one layer off; the last scrape opens the cell and the wombat shuffles in.
+    wombat.pose = 'dig';
+    wombat.digPhase = 1 - wombat.digPhase;
+    store.soil[next.x][next.y]--;
+    if (store.soil[next.x][next.y] === 0) {
+        store.cellsDug++;
+        (0,_core_board__WEBPACK_IMPORTED_MODULE_0__.addScore)(store, (_b = _core_constants__WEBPACK_IMPORTED_MODULE_2__.BURROW_LEVEL_POINTS[store.initialSoil[next.x][next.y]]) !== null && _b !== void 0 ? _b : 1);
+        if (!occupied())
+            Object.assign(wombat, { x: next.x, y: next.y });
+    }
+    return true;
 };
 
 
@@ -4499,10 +4635,10 @@ const buildSpriteDefs = (palette, usedRefs) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   CRUMBLE_STAGES: () => (/* binding */ CRUMBLE_STAGES),
 /* harmony export */   Renderer: () => (/* binding */ Renderer),
+/* harmony export */   SHRINK_STAGES: () => (/* binding */ SHRINK_STAGES),
 /* harmony export */   SVG_KEY_TIMES_PRECISION: () => (/* binding */ SVG_KEY_TIMES_PRECISION),
-/* harmony export */   crumbleStage: () => (/* binding */ crumbleStage)
+/* harmony export */   shrinkStage: () => (/* binding */ shrinkStage)
 /* harmony export */ });
 /* harmony import */ var _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../shared/utils/utils */ "./src/shared/utils/utils.ts");
 /* harmony import */ var _core_constants__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/constants */ "./src/burrow/core/constants.ts");
@@ -4513,6 +4649,25 @@ __webpack_require__.r(__webpack_exports__);
 const PITCH = _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE;
 const FIELD_TOP = _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_HEADER_HEIGHT;
 const FIELD_HEIGHT = _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT * PITCH;
+/** How the soil layer looks. Tweak these to change the feel without touching the filter itself. */
+const SOIL_LOOK = {
+    /** After the clump blur, alpha is mapped to `alpha * slope + offset`: a hard edge where the blurred alpha is
+     * about 0.45, so soil keeps roughly its cell shape but with rounded corners and walls. */
+    clumpAlphaSlope: 18,
+    clumpAlphaOffset: -8,
+    /** Grain: noise is mapped to `noise * slope + offset` as the alpha of dark specks (most noise stays below 0). */
+    grainSlope: 1.4,
+    grainOffset: -0.74,
+    /** The tunnel floor gets the same grain at this fraction of the strength. */
+    floorGrainStrength: 0.3,
+    /** The shadow the soil casts down into the tunnels. */
+    shadowBlur: 1.2,
+    shadowDrop: 2.2,
+    shadowOpacity: 0.3,
+    /** The light caught along the top edge of the soil. */
+    rimDepth: 1.4,
+    rimOpacity: 0.22
+};
 /**
  * The soil is one continuous layer of earth with open tunnels carved through it:
  * - a small blur followed by an alpha threshold rounds the soil into soft clods, so neighbouring days run
@@ -4521,34 +4676,37 @@ const FIELD_HEIGHT = _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT * 
  * - the soil casts a short shadow down into the tunnels and catches a little light on its top edges,
  *   so the tunnels read as carved out of it rather than painted on.
  */
-const buildSoilDefs = (width) => `<filter id="burrow-soil" filterUnits="userSpaceOnUse" x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" color-interpolation-filters="sRGB">` +
-    `<feGaussianBlur in="SourceGraphic" stdDeviation="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_SOIL_CLUMP}" result="soft"/>` +
-    `<feColorMatrix in="soft" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 18 -8" result="clump"/>` +
-    `<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>` +
-    `<feColorMatrix in="noise" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 0 0 0 -0.74" result="specks"/>` +
-    `<feComposite in="specks" in2="clump" operator="in" result="soilGrain"/>` +
-    `<feComposite in="specks" in2="clump" operator="out" result="looseFloorGrain"/>` +
-    `<feComponentTransfer in="looseFloorGrain" result="floorGrain"><feFuncA type="linear" slope="0.3"/></feComponentTransfer>` +
-    `<feGaussianBlur in="clump" stdDeviation="1.2" result="shadowSoft"/>` +
-    `<feOffset in="shadowSoft" dy="2.2" result="shadowDrop"/>` +
-    `<feFlood flood-color="#000000" flood-opacity="0.3"/>` +
-    `<feComposite in2="shadowDrop" operator="in" result="shadow"/>` +
-    `<feOffset in="clump" dy="1.4" result="clumpDown"/>` +
-    `<feComposite in="clump" in2="clumpDown" operator="out" result="topEdge"/>` +
-    `<feFlood flood-color="#ffffff" flood-opacity="0.22"/>` +
-    `<feComposite in2="topEdge" operator="in" result="rim"/>` +
-    `<feMerge><feMergeNode in="floorGrain"/><feMergeNode in="shadow"/><feMergeNode in="clump"/><feMergeNode in="soilGrain"/><feMergeNode in="rim"/></feMerge>` +
-    `</filter>` +
-    `<clipPath id="burrow-field"><rect x="0" y="${FIELD_TOP}" width="${width - _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE}" height="${FIELD_HEIGHT - _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE}" rx="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_FIELD_RADIUS}"/></clipPath>`;
+const buildSoilDefs = (width) => {
+    const look = SOIL_LOOK;
+    return (`<filter id="burrow-soil" filterUnits="userSpaceOnUse" x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" color-interpolation-filters="sRGB">` +
+        `<feGaussianBlur in="SourceGraphic" stdDeviation="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_SOIL_CLUMP}" result="soft"/>` +
+        `<feColorMatrix in="soft" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${look.clumpAlphaSlope} ${look.clumpAlphaOffset}" result="clump"/>` +
+        `<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>` +
+        `<feColorMatrix in="noise" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${look.grainSlope} 0 0 0 ${look.grainOffset}" result="specks"/>` +
+        `<feComposite in="specks" in2="clump" operator="in" result="soilGrain"/>` +
+        `<feComposite in="specks" in2="clump" operator="out" result="looseFloorGrain"/>` +
+        `<feComponentTransfer in="looseFloorGrain" result="floorGrain"><feFuncA type="linear" slope="${look.floorGrainStrength}"/></feComponentTransfer>` +
+        `<feGaussianBlur in="clump" stdDeviation="${look.shadowBlur}" result="shadowSoft"/>` +
+        `<feOffset in="shadowSoft" dy="${look.shadowDrop}" result="shadowDrop"/>` +
+        `<feFlood flood-color="#000000" flood-opacity="${look.shadowOpacity}"/>` +
+        `<feComposite in2="shadowDrop" operator="in" result="shadow"/>` +
+        `<feOffset in="clump" dy="${look.rimDepth}" result="clumpDown"/>` +
+        `<feComposite in="clump" in2="clumpDown" operator="out" result="topEdge"/>` +
+        `<feFlood flood-color="#ffffff" flood-opacity="${look.rimOpacity}"/>` +
+        `<feComposite in2="topEdge" operator="in" result="rim"/>` +
+        `<feMerge><feMergeNode in="floorGrain"/><feMergeNode in="shadow"/><feMergeNode in="clump"/><feMergeNode in="soilGrain"/><feMergeNode in="rim"/></feMerge>` +
+        `</filter>` +
+        `<clipPath id="burrow-field"><rect x="0" y="${FIELD_TOP}" width="${width - _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE}" height="${FIELD_HEIGHT - _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE}" rx="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_FIELD_RADIUS}"/></clipPath>`);
+};
 /** Number of steps a cell shrinks through while it is being dug. */
-const CRUMBLE_STAGES = 3;
-/** Size of a half-dug cell at each crumble stage (index = stage). */
-const CRUMBLE_SCALES = ['1', '0.8', '0.62', '0.45'];
+const SHRINK_STAGES = 3;
+/** Size of a half-dug cell at each shrink stage (index = stage). */
+const SHRINK_SCALES = ['1', '0.8', '0.62', '0.45'];
 /**
- * Crumble stage (1…CRUMBLE_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
+ * Shrink stage (1…SHRINK_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
  * cell is untouched or fully dug. A level-4 day goes through every stage; a level-1 day opens in one scrape.
  */
-const crumbleStage = (initial, remaining) => remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * CRUMBLE_STAGES - 1e-9);
+const shrinkStage = (initial, remaining) => remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * SHRINK_STAGES - 1e-9);
 const toX = (x) => x * (_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE);
 const toY = (y) => y * (_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_HEADER_HEIGHT;
 const centerX = (x) => toX(x) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE / 2;
@@ -4618,14 +4776,15 @@ const generateSteppedLinearAnimation = (positions) => {
         push(totalFrames - 1, positions[totalFrames - 1]);
     return { keyTimes: keyTimes.join(';'), values: values.join(';') };
 };
+/** A discrete <animate> for `attributeName`, or nothing when the value never changes. */
+const animateDiscrete = (attributeName, anim, durationMs) => anim
+    ? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
+    : '';
 const renderSprite = ({ positions, refs, opacities }, durationMs) => {
-    const animate = (attributeName, anim) => anim
-        ? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
-        : '';
     const positionAnim = generateSteppedLinearAnimation(positions);
     let svg = `<use href="${refs[0]}" opacity="${opacities[0]}" transform="translate(${positions[0]})">`;
-    svg += animate('href', generateChangingValuesAnimation(refs));
-    svg += animate('opacity', generateChangingValuesAnimation(opacities));
+    svg += animateDiscrete('href', generateChangingValuesAnimation(refs), durationMs);
+    svg += animateDiscrete('opacity', generateChangingValuesAnimation(opacities), durationMs);
     if (positionAnim) {
         svg += `<animateTransform attributeName="transform" type="translate" calcMode="linear" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${positionAnim.keyTimes}" values="${positionAnim.values}"/>`;
     }
@@ -4684,9 +4843,6 @@ const generateAnimatedSVG = (store) => {
     const snapshots = store.snapshots;
     // Tunnel cells are left transparent so the textured tunnel floor shows through underneath.
     const soilColor = (hardness) => (hardness > 0 ? theme.intensityColors[hardness] : 'transparent');
-    const animate = (attributeName, anim) => anim
-        ? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
-        : '';
     let cells = '';
     for (let x = 0; x < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_WIDTH; x++) {
         for (let y = 0; y < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT; y++) {
@@ -4696,16 +4852,16 @@ const generateAnimatedSVG = (store) => {
             // Cells are drawn edge to edge (no gaps) and shrink a step with each scrape while they are being dug.
             // Once a cell is dug out it is transparent, so it keeps its last size until the soil regrows; that
             // saves a keyframe per cell.
-            let scale = CRUMBLE_SCALES[0];
+            let scale = SHRINK_SCALES[0];
             const scales = snapshots.map((s) => {
                 var _a, _b;
                 if (s.soil[x][y] > 0)
-                    scale = CRUMBLE_SCALES[crumbleStage((_b = (_a = store.initialSoil[x]) === null || _a === void 0 ? void 0 : _a[y]) !== null && _b !== void 0 ? _b : 0, s.soil[x][y])];
+                    scale = SHRINK_SCALES[shrinkStage((_b = (_a = store.initialSoil[x]) === null || _a === void 0 ? void 0 : _a[y]) !== null && _b !== void 0 ? _b : 0, s.soil[x][y])];
                 return scale;
             });
             const scaleAnim = generateChangingValuesAnimation(scales);
             cells += `<rect x="${-PITCH / 2}" y="${-PITCH / 2}" width="${PITCH}" height="${PITCH}" fill="${fills[0]}" transform="translate(${centerX(x) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE / 2} ${centerY(y) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE / 2})">`;
-            cells += animate('fill', generateChangingValuesAnimation(fills));
+            cells += animateDiscrete('fill', generateChangingValuesAnimation(fills), durationMs);
             if (scaleAnim) {
                 cells += `<animateTransform attributeName="transform" type="scale" additive="sum" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${scaleAnim.keyTimes}" values="${scaleAnim.values}"/>`;
             }
