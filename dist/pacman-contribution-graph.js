@@ -3443,6 +3443,1170 @@ const BreakoutSVG = { generateAnimatedSVG };
 
 /***/ }),
 
+/***/ "./src/burrow/core/ai.ts":
+/*!*******************************!*\
+  !*** ./src/burrow/core/ai.ts ***!
+  \*******************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   DIRECTIONS: () => (/* binding */ DIRECTIONS),
+/* harmony export */   findCheapestPath: () => (/* binding */ findCheapestPath),
+/* harmony export */   findShortestPath: () => (/* binding */ findShortestPath),
+/* harmony export */   getNeighbors: () => (/* binding */ getNeighbors),
+/* harmony export */   inBounds: () => (/* binding */ inBounds),
+/* harmony export */   keyOf: () => (/* binding */ keyOf),
+/* harmony export */   manhattan: () => (/* binding */ manhattan),
+/* harmony export */   samePosition: () => (/* binding */ samePosition)
+/* harmony export */ });
+/* harmony import */ var _constants__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./constants */ "./src/burrow/core/constants.ts");
+
+const DIRECTIONS = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+    { x: -1, y: 0 }
+];
+const inBounds = (p) => p.x >= 0 && p.x < _constants__WEBPACK_IMPORTED_MODULE_0__.GRID_WIDTH && p.y >= 0 && p.y < _constants__WEBPACK_IMPORTED_MODULE_0__.GRID_HEIGHT;
+const keyOf = (p) => p.y * _constants__WEBPACK_IMPORTED_MODULE_0__.GRID_WIDTH + p.x;
+const samePosition = (a, b) => a.x === b.x && a.y === b.y;
+const manhattan = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+const getNeighbors = (p) => DIRECTIONS.map((d) => ({ x: p.x + d.x, y: p.y + d.y })).filter(inBounds);
+/** Ties go to the leftmost, then topmost cell, so the digger sweeps the graph from left to right. */
+const isBefore = (a, b) => a.cost !== b.cost ? a.cost < b.cost : a.position.x !== b.position.x ? a.position.x < b.position.x : a.position.y < b.position.y;
+/** Minimal binary heap; the grid is small but the search runs once per frame. */
+class MinQueue {
+    constructor() {
+        this.items = [];
+    }
+    get size() {
+        return this.items.length;
+    }
+    push(item) {
+        const items = this.items;
+        items.push(item);
+        let i = items.length - 1;
+        while (i > 0) {
+            const parent = (i - 1) >> 1;
+            if (!isBefore(items[i], items[parent]))
+                break;
+            [items[i], items[parent]] = [items[parent], items[i]];
+            i = parent;
+        }
+    }
+    pop() {
+        const items = this.items;
+        const top = items[0];
+        const last = items.pop();
+        if (items.length > 0) {
+            items[0] = last;
+            let i = 0;
+            for (;;) {
+                const left = i * 2 + 1;
+                const right = left + 1;
+                let smallest = i;
+                if (left < items.length && isBefore(items[left], items[smallest]))
+                    smallest = left;
+                if (right < items.length && isBefore(items[right], items[smallest]))
+                    smallest = right;
+                if (smallest === i)
+                    break;
+                [items[i], items[smallest]] = [items[smallest], items[i]];
+                i = smallest;
+            }
+        }
+        return top;
+    }
+}
+const rebuildPath = (start, target, previous) => {
+    const path = [];
+    let cursor = target;
+    while (cursor && !samePosition(cursor, start)) {
+        path.unshift(cursor);
+        cursor = previous.get(keyOf(cursor));
+    }
+    return path;
+};
+/**
+ * Cheapest path from `start` (which may sit just off the grid, in the den) to the nearest cell matching `isTarget`.
+ * `costOf` returns the cost of entering a cell, or `null` when it cannot be entered.
+ * Returns the path excluding `start`, or `null` when no target is reachable.
+ */
+const findCheapestPath = (start, costOf, isTarget) => {
+    var _a, _b;
+    const best = new Map();
+    const previous = new Map();
+    const queue = new MinQueue();
+    const startKey = inBounds(start) ? keyOf(start) : -1;
+    best.set(startKey, 0);
+    queue.push({ cost: 0, position: start });
+    while (queue.size > 0) {
+        const { cost, position } = queue.pop();
+        const key = inBounds(position) ? keyOf(position) : -1;
+        if (cost > ((_a = best.get(key)) !== null && _a !== void 0 ? _a : Infinity))
+            continue;
+        if (key !== startKey && isTarget(position))
+            return rebuildPath(start, position, previous);
+        for (const neighbor of getNeighbors(position)) {
+            const stepCost = costOf(neighbor);
+            if (stepCost === null)
+                continue;
+            const neighborKey = keyOf(neighbor);
+            const total = cost + stepCost;
+            if (total >= ((_b = best.get(neighborKey)) !== null && _b !== void 0 ? _b : Infinity))
+                continue;
+            best.set(neighborKey, total);
+            previous.set(neighborKey, position);
+            queue.push({ cost: total, position: neighbor });
+        }
+    }
+    return null;
+};
+/** Shortest path by step count through cells for which `canEnter` holds. Excludes `start`; `[]` if `start` is already a target. */
+const findShortestPath = (start, canEnter, isTarget) => {
+    if (isTarget(start))
+        return [];
+    return findCheapestPath(start, (p) => (canEnter(p) ? 1 : null), isTarget);
+};
+
+
+/***/ }),
+
+/***/ "./src/burrow/core/constants.ts":
+/*!**************************************!*\
+  !*** ./src/burrow/core/constants.ts ***!
+  \**************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   BURROW_BEETLE_APPEAR_FRAME: () => (/* binding */ BURROW_BEETLE_APPEAR_FRAME),
+/* harmony export */   BURROW_BEETLE_CHASE_RANGE: () => (/* binding */ BURROW_BEETLE_CHASE_RANGE),
+/* harmony export */   BURROW_BEETLE_MIN_X: () => (/* binding */ BURROW_BEETLE_MIN_X),
+/* harmony export */   BURROW_BEETLE_PATIENCE: () => (/* binding */ BURROW_BEETLE_PATIENCE),
+/* harmony export */   BURROW_BEETLE_SOIL_STEP: () => (/* binding */ BURROW_BEETLE_SOIL_STEP),
+/* harmony export */   BURROW_BEETLE_TUNNEL_STEP: () => (/* binding */ BURROW_BEETLE_TUNNEL_STEP),
+/* harmony export */   BURROW_BONK_POINTS: () => (/* binding */ BURROW_BONK_POINTS),
+/* harmony export */   BURROW_CELL_RADIUS: () => (/* binding */ BURROW_CELL_RADIUS),
+/* harmony export */   BURROW_DEN: () => (/* binding */ BURROW_DEN),
+/* harmony export */   BURROW_DURATION_DIVISOR: () => (/* binding */ BURROW_DURATION_DIVISOR),
+/* harmony export */   BURROW_END_HOLD_FRAMES: () => (/* binding */ BURROW_END_HOLD_FRAMES),
+/* harmony export */   BURROW_FREEZE_FRAMES: () => (/* binding */ BURROW_FREEZE_FRAMES),
+/* harmony export */   BURROW_HEADER_HEIGHT: () => (/* binding */ BURROW_HEADER_HEIGHT),
+/* harmony export */   BURROW_LANTERN_COOLDOWN: () => (/* binding */ BURROW_LANTERN_COOLDOWN),
+/* harmony export */   BURROW_LANTERN_RANGE: () => (/* binding */ BURROW_LANTERN_RANGE),
+/* harmony export */   BURROW_LEVEL_POINTS: () => (/* binding */ BURROW_LEVEL_POINTS),
+/* harmony export */   BURROW_LULL_HITS: () => (/* binding */ BURROW_LULL_HITS),
+/* harmony export */   BURROW_LULL_POINTS: () => (/* binding */ BURROW_LULL_POINTS),
+/* harmony export */   BURROW_MAX_BEETLES: () => (/* binding */ BURROW_MAX_BEETLES),
+/* harmony export */   BURROW_MAX_FRAMES: () => (/* binding */ BURROW_MAX_FRAMES),
+/* harmony export */   BURROW_MAX_IDLE_FRAMES: () => (/* binding */ BURROW_MAX_IDLE_FRAMES),
+/* harmony export */   BURROW_MAX_PEBBLES: () => (/* binding */ BURROW_MAX_PEBBLES),
+/* harmony export */   BURROW_MIN_DURATION_MS: () => (/* binding */ BURROW_MIN_DURATION_MS),
+/* harmony export */   BURROW_NAP_END_FRAMES: () => (/* binding */ BURROW_NAP_END_FRAMES),
+/* harmony export */   BURROW_NAP_FRAMES: () => (/* binding */ BURROW_NAP_FRAMES),
+/* harmony export */   BURROW_PEBBLE_CRUMBLE_FRAMES: () => (/* binding */ BURROW_PEBBLE_CRUMBLE_FRAMES),
+/* harmony export */   BURROW_PEBBLE_DANGER_COST: () => (/* binding */ BURROW_PEBBLE_DANGER_COST),
+/* harmony export */   BURROW_PEBBLE_SPACING: () => (/* binding */ BURROW_PEBBLE_SPACING),
+/* harmony export */   BURROW_PEBBLE_WOBBLE_FRAMES: () => (/* binding */ BURROW_PEBBLE_WOBBLE_FRAMES),
+/* harmony export */   BURROW_REGROW_FRAMES: () => (/* binding */ BURROW_REGROW_FRAMES),
+/* harmony export */   BURROW_SWEEP_WIDTH: () => (/* binding */ BURROW_SWEEP_WIDTH),
+/* harmony export */   BURROW_WAKE_FRAMES: () => (/* binding */ BURROW_WAKE_FRAMES),
+/* harmony export */   CELL_SIZE: () => (/* reexport safe */ _shared_constants__WEBPACK_IMPORTED_MODULE_0__.CELL_SIZE),
+/* harmony export */   DELTA_TIME: () => (/* reexport safe */ _shared_constants__WEBPACK_IMPORTED_MODULE_0__.DELTA_TIME),
+/* harmony export */   GAP_SIZE: () => (/* reexport safe */ _shared_constants__WEBPACK_IMPORTED_MODULE_0__.GAP_SIZE),
+/* harmony export */   GRID_HEIGHT: () => (/* reexport safe */ _shared_constants__WEBPACK_IMPORTED_MODULE_0__.GRID_HEIGHT),
+/* harmony export */   GRID_WIDTH: () => (/* reexport safe */ _shared_constants__WEBPACK_IMPORTED_MODULE_0__.GRID_WIDTH)
+/* harmony export */ });
+/* harmony import */ var _shared_constants__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../shared/constants */ "./src/shared/constants.ts");
+
+
+const BURROW_HEADER_HEIGHT = 24;
+const BURROW_CELL_RADIUS = 3;
+const BURROW_MIN_DURATION_MS = 5000;
+/** Frames play a little faster than the shared DELTA_TIME: digging dense days takes a lot of them. */
+const BURROW_DURATION_DIVISOR = 2;
+/** Hard cap on simulated frames, before the ending sequence. */
+const BURROW_MAX_FRAMES = 2400;
+/** Give up (and send the beetles home) after this many frames in a row without digging or lulling anything. */
+const BURROW_MAX_IDLE_FRAMES = 150;
+/** The wombat starts in its den, just off the left edge, in the middle row. */
+const BURROW_DEN = { x: -1, y: Math.floor(_shared_constants__WEBPACK_IMPORTED_MODULE_0__.GRID_HEIGHT / 2) };
+/** The wombat works on soil within this many columns of the leftmost soil left, sweeping left to right. */
+const BURROW_SWEEP_WIDTH = 2;
+/** Lantern light carries this many cells down a straight, open tunnel. */
+const BURROW_LANTERN_RANGE = 3;
+/** Frames between two lantern raises. */
+const BURROW_LANTERN_COOLDOWN = 1;
+/** Lantern hits needed to put a beetle to sleep. */
+const BURROW_LULL_HITS = 3;
+/** A lit beetle stays frozen for this many frames. */
+const BURROW_FREEZE_FRAMES = 3;
+/** Drowsiness wears off by one level after this many frames without light. */
+const BURROW_WAKE_FRAMES = 15;
+/** Frames a sleeping or dizzy beetle lingers before heading home. */
+const BURROW_NAP_FRAMES = 6;
+/** Beetles step once every N frames through tunnels, and more slowly when squeezing through soil. */
+const BURROW_BEETLE_TUNNEL_STEP = 2;
+const BURROW_BEETLE_SOIL_STEP = 4;
+/** Frames without a tunnel route before a beetle starts squeezing through soil. */
+const BURROW_BEETLE_PATIENCE = 8;
+/** Beetles closer than this (in steps) chase the wombat; farther away they amble about. */
+const BURROW_BEETLE_CHASE_RANGE = 14;
+const BURROW_BEETLE_APPEAR_FRAME = 3;
+const BURROW_MAX_BEETLES = 4;
+/** Beetles start no closer to the den than this column. */
+const BURROW_BEETLE_MIN_X = 14;
+const BURROW_MAX_PEBBLES = 5;
+/** Minimum number of columns between two pebbles. */
+const BURROW_PEBBLE_SPACING = 5;
+const BURROW_PEBBLE_WOBBLE_FRAMES = 3;
+const BURROW_PEBBLE_CRUMBLE_FRAMES = 2;
+/** Extra path cost for walking under a pebble that is about to fall. */
+const BURROW_PEBBLE_DANGER_COST = 15;
+const BURROW_NAP_END_FRAMES = 10;
+const BURROW_REGROW_FRAMES = 8;
+const BURROW_END_HOLD_FRAMES = 4;
+/** Score per dug cell, by contribution level (index = level). */
+const BURROW_LEVEL_POINTS = [0, 1, 2, 3, 5];
+const BURROW_LULL_POINTS = 20;
+const BURROW_BONK_POINTS = 30;
+
+
+/***/ }),
+
+/***/ "./src/burrow/core/game.ts":
+/*!*********************************!*\
+  !*** ./src/burrow/core/game.ts ***!
+  \*********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Game: () => (/* binding */ Game),
+/* harmony export */   findLanternTarget: () => (/* binding */ findLanternTarget),
+/* harmony export */   simulate: () => (/* binding */ simulate)
+/* harmony export */ });
+/* harmony import */ var _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../shared/utils/utils */ "./src/shared/utils/utils.ts");
+/* harmony import */ var _renderers_svg__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../renderers/svg */ "./src/burrow/renderers/svg.ts");
+/* harmony import */ var _ai__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./ai */ "./src/burrow/core/ai.ts");
+/* harmony import */ var _constants__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./constants */ "./src/burrow/core/constants.ts");
+/* harmony import */ var _random__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./random */ "./src/burrow/core/random.ts");
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+
+
+
+
+
+/* ───────────────────────── Board queries ───────────────────────── */
+const cloneSoil = (soil) => soil.map((column) => [...column]);
+const soilAt = (store, p) => ((0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(p) ? store.soil[p.x][p.y] : 0);
+const isTunnel = (store, p) => (0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(p) && store.soil[p.x][p.y] === 0;
+const countSoil = (soil) => soil.reduce((sum, column) => sum + column.filter((h) => h > 0).length, 0);
+const isSolidPebble = (pebble) => pebble.state !== 'gone';
+const pebbleAt = (store, p) => store.pebbles.find((pebble) => isSolidPebble(pebble) && (0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(pebble, p));
+const isActiveBeetle = (beetle) => beetle.state === 'awake' || beetle.state === 'asleep' || beetle.state === 'dizzy';
+const beetleAt = (store, p, except) => store.beetles.find((beetle) => beetle !== except && isActiveBeetle(beetle) && (0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(beetle, p));
+const facingTowards = (from, to, current) => to.x > from.x ? 'right' : to.x < from.x ? 'left' : current;
+/** A cell under a pebble that is about to come down. */
+const isUnderLoosePebble = (store, p) => store.pebbles.some((pebble) => (pebble.state === 'wobble' || pebble.state === 'falling') && pebble.x === p.x && pebble.y < p.y);
+const isFinished = (store) => countSoil(store.soil) === 0 && store.pebbles.every((p) => p.state === 'gone') && store.beetles.every((b) => b.state === 'gone');
+/* ───────────────────────── Setup ───────────────────────── */
+const levelOf = (store, x, y) => {
+    var _a;
+    const cell = (_a = store.grid[x]) === null || _a === void 0 ? void 0 : _a[y];
+    if (!cell || cell.commitsCount <= 0)
+        return 0;
+    return Math.max(1, _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__.Utils.levelToIndex(cell.level));
+};
+const shuffle = (items, random) => {
+    const result = [...items];
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+};
+/** Pebbles sit on the busiest days, always on top of soil so they only fall once the wombat digs underneath. */
+const placePebbles = (store, random) => {
+    const soilCells = countSoil(store.soil);
+    const limit = Math.min(_constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_PEBBLES, Math.floor(soilCells / 30));
+    const candidates = [];
+    for (let x = 2; x < _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_WIDTH; x++) {
+        for (let y = 0; y < _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_HEIGHT - 1; y++) {
+            if (store.soil[x][y] === 4 && store.soil[x][y + 1] > 0)
+                candidates.push({ x, y });
+        }
+    }
+    const pebbles = [];
+    for (const candidate of shuffle(candidates, random)) {
+        if (pebbles.length >= limit)
+            break;
+        if (pebbles.some((p) => Math.abs(p.x - candidate.x) < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_PEBBLE_SPACING))
+            continue;
+        pebbles.push(Object.assign(Object.assign({ id: pebbles.length }, candidate), { state: 'resting', timer: 0, level: store.soil[candidate.x][candidate.y], spawn: Object.assign({}, candidate) }));
+    }
+    for (const pebble of pebbles)
+        store.soil[pebble.x][pebble.y] = 0;
+    return pebbles.sort((a, b) => a.x - b.x).map((p, id) => (Object.assign(Object.assign({}, p), { id })));
+};
+/** Beetles start spread across the right of the graph, in open tunnels where possible. */
+const placeBeetles = (store, random) => {
+    const soilCells = countSoil(store.soil);
+    const count = soilCells === 0 ? 2 : Math.min(_constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_BEETLES, 1 + Math.floor(soilCells / 90));
+    const span = (_constants__WEBPACK_IMPORTED_MODULE_3__.GRID_WIDTH - _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_MIN_X) / count;
+    const beetles = [];
+    for (let i = 0; i < count; i++) {
+        const fromX = Math.floor(_constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_MIN_X + i * span);
+        const toX = Math.floor(_constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_MIN_X + (i + 1) * span);
+        const cells = [];
+        for (let x = fromX; x < toX; x++) {
+            for (let y = 0; y < _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_HEIGHT; y++) {
+                if (!pebbleAt(store, { x, y }))
+                    cells.push({ x, y });
+            }
+        }
+        const tunnels = cells.filter((p) => isTunnel(store, p));
+        const pool = tunnels.length > 0 ? tunnels : cells;
+        if (pool.length === 0)
+            continue;
+        const spot = pool[Math.floor(random() * pool.length)];
+        beetles.push(Object.assign(Object.assign({ id: i }, spot), { state: 'hidden', facing: 'left', drowsiness: 0, frozenFor: 0, lastLitFrame: 0, moveCooldown: 0, stuckFrames: 0, timer: 0, spawn: Object.assign({}, spot) }));
+    }
+    return beetles;
+};
+const resetGameState = (store) => {
+    store.frameCount = 0;
+    store.score = 0;
+    store.cellsDug = 0;
+    store.beetlesLulled = 0;
+    store.beetlesBonked = 0;
+    store.snapshots = [];
+    store.soil = Array.from({ length: _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_WIDTH }, (_, x) => Array.from({ length: _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_HEIGHT }, (_, y) => levelOf(store, x, y)));
+    const seed = store.contributions.reduce((sum, c) => sum + c.count, 0) * 31 + countSoil(store.soil);
+    const random = (0,_random__WEBPACK_IMPORTED_MODULE_4__.createRandom)(seed);
+    store.pebbles = placePebbles(store, random);
+    store.initialSoil = cloneSoil(store.soil);
+    store.beetles = placeBeetles(store, random);
+    store.wombat = Object.assign(Object.assign({}, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, lanternCooldown: 0, lanternAim: 'side', visible: true });
+    pushSnapshot(store);
+    return random;
+};
+const pushSnapshot = (store) => {
+    store.snapshots.push({
+        soil: cloneSoil(store.soil),
+        wombat: Object.assign({}, store.wombat),
+        beetles: store.beetles.map((b) => (Object.assign(Object.assign({}, b), { spawn: Object.assign({}, b.spawn) }))),
+        pebbles: store.pebbles.map((p) => (Object.assign(Object.assign({}, p), { spawn: Object.assign({}, p.spawn) })))
+    });
+    store.frameCount = store.snapshots.length - 1;
+};
+const addScore = (store, points) => {
+    if (points <= 0)
+        return;
+    store.score += points;
+    store.config.pointsIncreasedCallback(store.score);
+};
+/* ───────────────────────── Wombat ───────────────────────── */
+/**
+ * The first awake beetle the lantern can reach: in a straight line, at most BURROW_LANTERN_RANGE cells away,
+ * with only open tunnel in between. Light does not pass through soil, except right up close.
+ */
+const findLanternTarget = (store) => {
+    const { wombat } = store;
+    for (const { x: dx, y: dy } of [
+        { x: wombat.facing === 'right' ? 1 : -1, y: 0 },
+        { x: wombat.facing === 'right' ? -1 : 1, y: 0 },
+        { x: 0, y: -1 },
+        { x: 0, y: 1 }
+    ]) {
+        for (let distance = 1; distance <= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LANTERN_RANGE; distance++) {
+            const p = { x: wombat.x + dx * distance, y: wombat.y + dy * distance };
+            if (!(0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(p) || pebbleAt(store, p))
+                break;
+            const beetle = beetleAt(store, p);
+            if (beetle) {
+                if (beetle.state === 'awake' && (distance === 1 || isTunnel(store, p)))
+                    return beetle;
+                break;
+            }
+            if (!isTunnel(store, p))
+                break;
+        }
+    }
+    return null;
+};
+const raiseLantern = (store, beetle, frame) => {
+    const { wombat } = store;
+    wombat.pose = 'lantern';
+    wombat.facing = facingTowards(wombat, beetle, wombat.facing);
+    wombat.lanternAim = beetle.y < wombat.y ? 'up' : beetle.y > wombat.y ? 'down' : 'side';
+    wombat.lanternCooldown = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LANTERN_COOLDOWN + 1;
+    beetle.drowsiness++;
+    beetle.frozenFor = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_FREEZE_FRAMES;
+    beetle.lastLitFrame = frame;
+    if (beetle.drowsiness >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LULL_HITS) {
+        beetle.state = 'asleep';
+        beetle.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_NAP_FRAMES;
+        store.beetlesLulled++;
+        addScore(store, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LULL_POINTS);
+    }
+};
+const wombatStepCost = (store, p) => {
+    if (pebbleAt(store, p) || beetleAt(store, p))
+        return null;
+    const danger = isUnderLoosePebble(store, p) ? _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_PEBBLE_DANGER_COST : 0;
+    return 1 + store.soil[p.x][p.y] + danger;
+};
+/** Leftmost column that still has soil in it. */
+const soilFrontier = (store) => store.soil.findIndex((column) => column.some((h) => h > 0));
+/**
+ * Where the wombat heads next: the cheapest soil near the left edge of what is left (so it works through the
+ * graph from left to right instead of leaving dense days behind), any soil if that is blocked, or, once the soil
+ * is gone, the nearest awake beetle.
+ */
+const planWombatPath = (store) => {
+    var _a;
+    const { wombat } = store;
+    const frontier = soilFrontier(store);
+    if (frontier >= 0) {
+        const stepCost = (p) => wombatStepCost(store, p);
+        const isSoil = (p) => store.soil[p.x][p.y] > 0;
+        return ((_a = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, stepCost, (p) => isSoil(p) && p.x <= frontier + _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_SWEEP_WIDTH)) !== null && _a !== void 0 ? _a : (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, stepCost, isSoil));
+    }
+    if (!store.beetles.some((b) => b.state === 'awake'))
+        return null;
+    return (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findCheapestPath)(wombat, (p) => {
+        const beetle = beetleAt(store, p);
+        if (beetle)
+            return beetle.state === 'awake' ? 1 : null;
+        return wombatStepCost(store, p);
+    }, (p) => { var _a; return ((_a = beetleAt(store, p)) === null || _a === void 0 ? void 0 : _a.state) === 'awake'; });
+};
+/** Returns true when the wombat dug or lulled something this frame. */
+const moveWombat = (store, frame) => {
+    var _a, _b;
+    const { wombat } = store;
+    wombat.lanternCooldown = Math.max(0, wombat.lanternCooldown - 1);
+    wombat.pose = 'walk';
+    const beetle = wombat.lanternCooldown === 0 ? findLanternTarget(store) : null;
+    if (beetle) {
+        raiseLantern(store, beetle, frame);
+        return true;
+    }
+    const next = (_a = planWombatPath(store)) === null || _a === void 0 ? void 0 : _a[0];
+    if (!next)
+        return false;
+    wombat.facing = facingTowards(wombat, next, wombat.facing);
+    const occupied = () => !!beetleAt(store, next) || !!pebbleAt(store, next);
+    if (soilAt(store, next) === 0) {
+        if (!occupied())
+            Object.assign(wombat, { x: next.x, y: next.y });
+        return false;
+    }
+    // Scrape one layer off; the last scrape opens the cell and the wombat shuffles in.
+    wombat.pose = 'dig';
+    wombat.digPhase = 1 - wombat.digPhase;
+    store.soil[next.x][next.y]--;
+    if (store.soil[next.x][next.y] === 0) {
+        store.cellsDug++;
+        addScore(store, (_b = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LEVEL_POINTS[store.initialSoil[next.x][next.y]]) !== null && _b !== void 0 ? _b : 1);
+        if (!occupied())
+            Object.assign(wombat, { x: next.x, y: next.y });
+    }
+    return true;
+};
+/* ───────────────────────── Pebbles ───────────────────────── */
+/** Returns true when any pebble moved or changed state. */
+const updatePebbles = (store) => {
+    var _a;
+    let changed = false;
+    for (const pebble of store.pebbles) {
+        const below = { x: pebble.x, y: pebble.y + 1 };
+        const canDrop = () => (0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(below) && isTunnel(store, below) && !pebbleAt(store, below) && !(0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(store.wombat, below);
+        switch (pebble.state) {
+            case 'resting':
+                if (canDrop()) {
+                    pebble.state = 'wobble';
+                    pebble.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_PEBBLE_WOBBLE_FRAMES;
+                    changed = true;
+                }
+                break;
+            case 'wobble':
+                if (--pebble.timer <= 0)
+                    pebble.state = 'falling';
+                changed = true;
+                break;
+            case 'falling':
+                if (canDrop()) {
+                    pebble.y++;
+                    for (const beetle of store.beetles) {
+                        if (beetle.state === 'awake' && (0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(beetle, pebble)) {
+                            beetle.state = 'dizzy';
+                            beetle.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_NAP_FRAMES;
+                            store.beetlesBonked++;
+                            addScore(store, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BONK_POINTS);
+                        }
+                    }
+                }
+                else {
+                    pebble.state = 'crumble';
+                    pebble.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_PEBBLE_CRUMBLE_FRAMES;
+                }
+                changed = true;
+                break;
+            case 'crumble':
+                if (--pebble.timer <= 0) {
+                    pebble.state = 'gone';
+                    store.cellsDug++;
+                    addScore(store, (_a = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LEVEL_POINTS[pebble.level]) !== null && _a !== void 0 ? _a : 1);
+                }
+                changed = true;
+                break;
+        }
+    }
+    return changed;
+};
+/* ───────────────────────── Beetles ───────────────────────── */
+const pickBeetleStep = (store, beetle, random) => {
+    var _a, _b;
+    const { wombat } = store;
+    const free = (p) => !(0,_ai__WEBPACK_IMPORTED_MODULE_2__.samePosition)(p, wombat) && !pebbleAt(store, p) && !beetleAt(store, p, beetle);
+    const nextToWombat = (p) => (0,_ai__WEBPACK_IMPORTED_MODULE_2__.manhattan)(p, wombat) === 1;
+    const tunnelSteps = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.getNeighbors)(beetle).filter((p) => isTunnel(store, p) && free(p));
+    const amble = () => (tunnelSteps.length > 0 ? tunnelSteps[Math.floor(random() * tunnelSteps.length)] : null);
+    const tunnelPath = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findShortestPath)(beetle, (p) => isTunnel(store, p) && free(p), nextToWombat);
+    if (tunnelPath) {
+        beetle.stuckFrames = 0;
+        if (tunnelPath.length === 0)
+            return null; // already nibbling at the wombat's heels
+        if (tunnelPath.length <= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_CHASE_RANGE || random() < 0.5)
+            return tunnelPath[0];
+        return amble();
+    }
+    // No tunnel leads to the wombat: amble for a while, then squeeze through the soil.
+    if (++beetle.stuckFrames < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_PATIENCE && tunnelSteps.length > 0)
+        return amble();
+    if (nextToWombat(beetle))
+        return null;
+    return (_b = (_a = (0,_ai__WEBPACK_IMPORTED_MODULE_2__.findShortestPath)(beetle, free, nextToWombat)) === null || _a === void 0 ? void 0 : _a[0]) !== null && _b !== void 0 ? _b : null;
+};
+const updateBeetles = (store, frame, random) => {
+    for (const beetle of store.beetles) {
+        if (beetle.state === 'hidden' && frame >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_APPEAR_FRAME)
+            beetle.state = 'awake';
+        if (beetle.state === 'asleep' || beetle.state === 'dizzy') {
+            if (--beetle.timer <= 0)
+                beetle.state = 'gone';
+            continue;
+        }
+        if (beetle.state !== 'awake')
+            continue;
+        if (beetle.drowsiness > 0 && frame - beetle.lastLitFrame >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_WAKE_FRAMES) {
+            beetle.drowsiness--;
+            beetle.lastLitFrame = frame;
+        }
+        if (beetle.frozenFor > 0) {
+            beetle.frozenFor--;
+            continue;
+        }
+        if (beetle.moveCooldown > 0) {
+            beetle.moveCooldown--;
+            continue;
+        }
+        const step = pickBeetleStep(store, beetle, random);
+        if (!step)
+            continue;
+        beetle.facing = facingTowards(beetle, step, beetle.facing);
+        beetle.x = step.x;
+        beetle.y = step.y;
+        beetle.moveCooldown = (isTunnel(store, step) ? _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_TUNNEL_STEP : _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_BEETLE_SOIL_STEP) - 1;
+    }
+};
+/* ───────────────────────── Ending ───────────────────────── */
+/**
+ * The wombat naps, then the soil regrows from left to right and everything returns to where it started,
+ * so the last frame matches the first and the animation loops seamlessly.
+ */
+const playEnding = (store) => {
+    for (const beetle of store.beetles)
+        beetle.state = beetle.state === 'hidden' ? 'hidden' : 'gone';
+    store.wombat.pose = 'sleep';
+    for (let i = 0; i < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_NAP_END_FRAMES; i++)
+        pushSnapshot(store);
+    // Hide everything first and move it back a frame later, so nothing visibly slides across the board.
+    store.wombat.visible = false;
+    for (const pebble of store.pebbles)
+        pebble.state = 'gone';
+    pushSnapshot(store);
+    Object.assign(store.wombat, Object.assign(Object.assign({}, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, lanternCooldown: 0, lanternAim: 'side' }));
+    for (const beetle of store.beetles)
+        Object.assign(beetle, Object.assign(Object.assign({}, beetle.spawn), { state: 'hidden', facing: 'left', drowsiness: 0 }));
+    for (const pebble of store.pebbles)
+        Object.assign(pebble, Object.assign(Object.assign({}, pebble.spawn), { timer: 0 }));
+    pushSnapshot(store);
+    for (let step = 1; step <= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_REGROW_FRAMES; step++) {
+        const upTo = Math.ceil((step / _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_REGROW_FRAMES) * _constants__WEBPACK_IMPORTED_MODULE_3__.GRID_WIDTH);
+        for (let x = 0; x < upTo; x++)
+            store.soil[x] = [...store.initialSoil[x]];
+        for (const pebble of store.pebbles)
+            if (pebble.x < upTo)
+                pebble.state = 'resting';
+        pushSnapshot(store);
+    }
+    for (let i = 0; i < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_END_HOLD_FRAMES; i++)
+        pushSnapshot(store);
+};
+/* ───────────────────────── Main loop ───────────────────────── */
+/** Simulates the whole game into `store.snapshots`, without rendering. */
+const simulate = (store) => {
+    const random = resetGameState(store);
+    const maxFrames = store.config.maxFrames ? Math.min(store.config.maxFrames, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_FRAMES) : _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_FRAMES;
+    let idleFrames = 0;
+    while (!isFinished(store) && store.snapshots.length < maxFrames && idleFrames < _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_MAX_IDLE_FRAMES) {
+        const frame = store.snapshots.length;
+        const progressed = moveWombat(store, frame);
+        const pebblesMoved = updatePebbles(store);
+        updateBeetles(store, frame, random);
+        pushSnapshot(store);
+        idleFrames = progressed || pebblesMoved ? 0 : idleFrames + 1;
+    }
+    playEnding(store);
+};
+const startGame = (store) => __awaiter(void 0, void 0, void 0, function* () {
+    simulate(store);
+    const svg = _renderers_svg__WEBPACK_IMPORTED_MODULE_1__.Renderer.generateAnimatedSVG(store);
+    store.config.svgCallback(svg);
+    if (store.config.gameStatsCallback) {
+        store.config.gameStatsCallback({
+            totalScore: store.score,
+            steps: store.frameCount,
+            ghostsEaten: store.beetlesLulled + store.beetlesBonked
+        });
+    }
+    store.config.gameOverCallback();
+});
+const stopGame = (store) => __awaiter(void 0, void 0, void 0, function* () {
+    clearInterval(store.gameInterval);
+});
+const Game = {
+    startGame,
+    stopGame
+};
+
+
+/***/ }),
+
+/***/ "./src/burrow/core/random.ts":
+/*!***********************************!*\
+  !*** ./src/burrow/core/random.ts ***!
+  \***********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   createRandom: () => (/* binding */ createRandom)
+/* harmony export */ });
+/** Small deterministic PRNG (mulberry32) so the same contribution graph always plays the same game. */
+const createRandom = (seed) => {
+    let state = seed >>> 0 || 1;
+    return () => {
+        state = (state + 0x6d2b79f5) >>> 0;
+        let t = state;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+};
+
+
+/***/ }),
+
+/***/ "./src/burrow/core/store.ts":
+/*!**********************************!*\
+  !*** ./src/burrow/core/store.ts ***!
+  \**********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Store: () => (/* binding */ Store)
+/* harmony export */ });
+const Store = {
+    contributions: [],
+    grid: [],
+    monthLabels: [],
+    config: undefined,
+    gameInterval: 0,
+    frameCount: 0,
+    soil: [],
+    initialSoil: [],
+    wombat: { x: -1, y: 3, facing: 'right', pose: 'walk', digPhase: 0, lanternCooldown: 0, lanternAim: 'side', visible: true },
+    beetles: [],
+    pebbles: [],
+    snapshots: [],
+    score: 0,
+    cellsDug: 0,
+    beetlesLulled: 0,
+    beetlesBonked: 0
+};
+
+
+/***/ }),
+
+/***/ "./src/burrow/index.ts":
+/*!*****************************!*\
+  !*** ./src/burrow/index.ts ***!
+  \*****************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   BurrowRenderer: () => (/* binding */ BurrowRenderer)
+/* harmony export */ });
+/* harmony import */ var _burrow_core_game__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../burrow/core/game */ "./src/burrow/core/game.ts");
+/* harmony import */ var _burrow_core_store__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../burrow/core/store */ "./src/burrow/core/store.ts");
+/* harmony import */ var _shared_providers_providers__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../shared/providers/providers */ "./src/shared/providers/providers.ts");
+/* harmony import */ var _shared_utils_utils__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../shared/utils/utils */ "./src/shared/utils/utils.ts");
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+
+
+
+
+class BurrowRenderer {
+    constructor(conf) {
+        this.conf = Object.assign({}, conf);
+    }
+    start() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const defaultConfig = {
+                platform: 'github',
+                username: '',
+                svgCallback: (_) => { },
+                gameOverCallback: () => { },
+                gameTheme: 'github',
+                pointsIncreasedCallback: (_) => { },
+                githubSettings: { accessToken: '' }
+            };
+            this.store = JSON.parse(JSON.stringify(_burrow_core_store__WEBPACK_IMPORTED_MODULE_1__.Store));
+            this.store.config = Object.assign(Object.assign({}, defaultConfig), this.conf);
+            this.store.contributions = yield _shared_providers_providers__WEBPACK_IMPORTED_MODULE_2__.Providers.fetchContributions(this.store);
+            _shared_utils_utils__WEBPACK_IMPORTED_MODULE_3__.Utils.buildGrid(this.store);
+            _shared_utils_utils__WEBPACK_IMPORTED_MODULE_3__.Utils.buildMonthLabels(this.store);
+            yield _burrow_core_game__WEBPACK_IMPORTED_MODULE_0__.Game.startGame(this.store);
+            return this.store;
+        });
+    }
+    stop() {
+        _burrow_core_game__WEBPACK_IMPORTED_MODULE_0__.Game.stopGame(this.store);
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/burrow/renderers/sprites.ts":
+/*!*****************************************!*\
+  !*** ./src/burrow/renderers/sprites.ts ***!
+  \*****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   beetleRef: () => (/* binding */ beetleRef),
+/* harmony export */   buildSpriteDefs: () => (/* binding */ buildSpriteDefs),
+/* harmony export */   getBurrowPalette: () => (/* binding */ getBurrowPalette),
+/* harmony export */   pebbleRef: () => (/* binding */ pebbleRef),
+/* harmony export */   wombatRef: () => (/* binding */ wombatRef)
+/* harmony export */ });
+const getBurrowPalette = (theme) => {
+    const isDark = theme.endsWith('-dark');
+    return isDark
+        ? {
+            tunnel: '#2b2019',
+            outline: '#14100c',
+            fur: '#b58d68',
+            furShade: '#8f6b4c',
+            nose: '#3a2a20',
+            cheek: '#e79a92',
+            lamp: '#ffcf5c',
+            glow: '#ffd98a',
+            shell: '#b48ad6',
+            shellSpot: '#d9c2ee',
+            beetleHead: '#4a3560',
+            pebble: '#a39d94',
+            pebbleShade: '#7d776f',
+            sparkle: '#ffe08a',
+            snooze: '#f3e3c8'
+        }
+        : {
+            tunnel: '#efe3cf',
+            outline: '#3b2a1e',
+            fur: '#a07a58',
+            furShade: '#7f5d40',
+            nose: '#3b2a1e',
+            cheek: '#ef9f97',
+            lamp: '#ffc23d',
+            glow: '#ffd56b',
+            shell: '#7b4b94',
+            shellSpot: '#b893cb',
+            beetleHead: '#3d2a4d',
+            pebble: '#8f8a83',
+            pebbleShade: '#68635d',
+            sparkle: '#e0a21a',
+            snooze: '#6b4f3a'
+        };
+};
+/* ───────────────────────── Sprite ids ───────────────────────── */
+const wombatRef = (wombat) => {
+    switch (wombat.pose) {
+        case 'sleep':
+            return '#bw-sleep';
+        case 'dig':
+            return `#bw-dig${wombat.digPhase}-${wombat.facing[0]}`;
+        case 'lantern':
+            return `#bw-lantern${wombat.lanternAim === 'side' ? '' : `-${wombat.lanternAim[0]}`}-${wombat.facing[0]}`;
+        default:
+            return `#bw-walk-${wombat.facing[0]}`;
+    }
+};
+const beetleRef = (beetle) => {
+    switch (beetle.state) {
+        case 'asleep':
+            return '#bb-asleep';
+        case 'dizzy':
+            return '#bb-dizzy';
+        default:
+            return beetle.drowsiness > 0
+                ? `#bb-drowsy${Math.min(beetle.drowsiness, 2)}-${beetle.facing[0]}`
+                : `#bb-walk-${beetle.facing[0]}`;
+    }
+};
+const pebbleRef = (pebble) => {
+    switch (pebble.state) {
+        case 'wobble':
+            return pebble.timer % 2 === 0 ? '#bp-tilt-a' : '#bp-tilt-b';
+        case 'crumble':
+            return '#bp-crumble';
+        default:
+            return '#bp-rest';
+    }
+};
+/* ───────────────────────── Drawings ───────────────────────── */
+const wombatBody = (c) => `<ellipse cx="-5" cy="7.6" rx="2.2" ry="1.4" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<ellipse cx="2" cy="7.6" rx="2.2" ry="1.4" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<ellipse cx="-1.5" cy="2" rx="8" ry="6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1.1"/>` +
+    `<path d="M-7 4 Q-2 7 3 4" fill="none" stroke="${c.furShade}" stroke-width="1" stroke-linecap="round"/>` +
+    `<ellipse cx="1.8" cy="-4.6" rx="1.5" ry="2" fill="${c.fur}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<circle cx="5" cy="-0.4" r="4.6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1.1"/>` +
+    `<circle cx="4.2" cy="-4.4" r="1.4" fill="${c.lamp}" stroke="${c.outline}" stroke-width="0.6"/>` +
+    `<ellipse cx="8.8" cy="0.2" rx="2" ry="1.6" fill="${c.nose}"/>` +
+    `<circle cx="6.1" cy="-1.4" r="0.9" fill="${c.outline}"/>` +
+    `<circle cx="6.4" cy="-1.7" r="0.3" fill="#ffffff"/>` +
+    `<circle cx="5" cy="1.8" r="1.1" fill="${c.cheek}" opacity="0.75"/>`;
+const wombatPaw = (c, x, y) => `<ellipse cx="${x}" cy="${y}" rx="2" ry="1.5" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<path d="M${x + 1.6} ${y - 0.8} l1.4 -0.4 M${x + 1.9} ${y + 0.2} l1.5 0 M${x + 1.6} ${y + 1} l1.4 0.5" stroke="${c.outline}" stroke-width="0.6" stroke-linecap="round"/>`;
+const crumbs = (c, points) => points.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="0.9" fill="${c.furShade}" opacity="0.8"/>`).join('');
+/** A soft cone of light from the lantern towards the beetle, plus a halo round the lantern itself. */
+const lanternGlow = (c, cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${c.glow}" opacity="0.28"/>` +
+    `<circle cx="11" cy="1" r="6" fill="${c.glow}" opacity="0.4"/>`;
+const wombatWithLantern = (c) => wombatBody(c) +
+    `<path d="M9 -2.5 v-1.5 h3 v1.5" fill="none" stroke="${c.outline}" stroke-width="0.7"/>` +
+    `<rect x="8.6" y="-2.5" width="3.8" height="5" rx="1" fill="${c.lamp}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    wombatPaw(c, 8, 4);
+const wombatSprites = (c) => ({
+    'bw-walk-r': wombatBody(c),
+    'bw-dig0-r': wombatBody(c) +
+        wombatPaw(c, 7.5, 5.5) +
+        crumbs(c, [
+            [11.5, 3],
+            [12.5, 6]
+        ]),
+    'bw-dig1-r': wombatBody(c) +
+        wombatPaw(c, 8.5, 3) +
+        crumbs(c, [
+            [12, 0.5],
+            [11, 7]
+        ]),
+    'bw-lantern-r': lanternGlow(c, 22, 1, 14, 6) + wombatWithLantern(c),
+    'bw-lantern-u-r': lanternGlow(c, 10.5, -14, 6, 14) + wombatWithLantern(c),
+    'bw-lantern-d-r': lanternGlow(c, 10.5, 16, 6, 14) + wombatWithLantern(c),
+    'bw-sleep': `<ellipse cx="0" cy="3" rx="8.5" ry="6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1.1"/>` +
+        `<path d="M-6 5 Q0 8.5 6 5" fill="none" stroke="${c.furShade}" stroke-width="1" stroke-linecap="round"/>` +
+        `<circle cx="4.5" cy="2.5" r="3.6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1"/>` +
+        `<ellipse cx="7.4" cy="3.4" rx="1.5" ry="1.2" fill="${c.nose}"/>` +
+        `<path d="M3.4 1.8 q1 0.9 2 0" fill="none" stroke="${c.outline}" stroke-width="0.7" stroke-linecap="round"/>` +
+        `<circle cx="3.8" cy="4.2" r="0.9" fill="${c.cheek}" opacity="0.75"/>` +
+        `<text x="5" y="-5" font-size="6" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>` +
+        `<text x="9" y="-9" font-size="4.5" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>`
+});
+const beetleLegs = (c) => `<path d="M-4 3.5 l-1.5 2.5 M0 4.2 l0 2.6 M4 3.5 l1.5 2.5" stroke="${c.outline}" stroke-width="0.8" stroke-linecap="round"/>`;
+const beetleBody = (c, eyes) => beetleLegs(c) +
+    `<path d="M6.5 -1.5 q2 -3.5 0.5 -5.5 M7.5 -0.5 q3.5 -2.5 3 -5" fill="none" stroke="${c.outline}" stroke-width="0.7" stroke-linecap="round"/>` +
+    `<circle cx="6.2" cy="1" r="2.8" fill="${c.beetleHead}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<ellipse cx="-0.5" cy="1" rx="6.2" ry="4.6" fill="${c.shell}" stroke="${c.outline}" stroke-width="1"/>` +
+    `<path d="M-0.5 -3.6 V5.6" stroke="${c.outline}" stroke-width="0.7"/>` +
+    `<circle cx="-3" cy="-0.2" r="1" fill="${c.shellSpot}"/><circle cx="2" cy="2.4" r="0.9" fill="${c.shellSpot}"/>` +
+    eyes;
+const grumpyEyes = (c) => `<circle cx="7.2" cy="0.6" r="1.1" fill="#ffffff"/><circle cx="7.6" cy="0.8" r="0.5" fill="${c.outline}"/>` +
+    `<path d="M5.8 -1 l2.6 0.8" stroke="${c.outline}" stroke-width="0.7" stroke-linecap="round"/>`;
+const sleepyEyes = (c, closed) => closed
+    ? `<path d="M6.4 1 q0.9 0.8 1.8 0" fill="none" stroke="#ffffff" stroke-width="0.7" stroke-linecap="round"/>`
+    : `<circle cx="7.2" cy="0.8" r="1.1" fill="#ffffff"/><path d="M6 0.4 h2.4" stroke="${c.beetleHead}" stroke-width="1.2"/>` +
+        `<circle cx="7.5" cy="1.1" r="0.45" fill="${c.outline}"/>`;
+const sparkle = (c, x, y, r) => `<path d="M${x} ${y - r} L${x + r * 0.3} ${y - r * 0.3} L${x + r} ${y} L${x + r * 0.3} ${y + r * 0.3} L${x} ${y + r} L${x - r * 0.3} ${y + r * 0.3} L${x - r} ${y} L${x - r * 0.3} ${y - r * 0.3}Z" fill="${c.sparkle}"/>`;
+const beetleSprites = (c) => ({
+    'bb-walk-r': beetleBody(c, grumpyEyes(c)),
+    'bb-drowsy1-r': beetleBody(c, sleepyEyes(c, false)) + sparkle(c, 0, -7, 2.2),
+    'bb-drowsy2-r': beetleBody(c, sleepyEyes(c, true)) + sparkle(c, -3, -7, 2.4) + sparkle(c, 3, -8, 1.6),
+    'bb-asleep': `<ellipse cx="0" cy="3" rx="6.4" ry="4.2" fill="${c.shell}" stroke="${c.outline}" stroke-width="1"/>` +
+        `<path d="M0 -1 V7" stroke="${c.outline}" stroke-width="0.7"/>` +
+        `<circle cx="-2.6" cy="2" r="0.9" fill="${c.shellSpot}"/><circle cx="2.4" cy="4" r="0.8" fill="${c.shellSpot}"/>` +
+        `<text x="3" y="-3" font-size="5.5" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>` +
+        `<text x="7" y="-6.5" font-size="4" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>`,
+    'bb-dizzy': beetleBody(c, `<path d="M6.4 0 l1.6 1.6 M8 0 l-1.6 1.6" stroke="#ffffff" stroke-width="0.7" stroke-linecap="round"/>`) +
+        sparkle(c, -4, -7, 1.6) +
+        sparkle(c, 0, -8.5, 1.6) +
+        sparkle(c, 4, -7, 1.6)
+});
+const pebbleShape = (c) => `<path d="M-7 4 Q-8 -2 -3 -5 Q2 -7 6 -3 Q9 1 6 5 Q0 8 -7 4Z" fill="${c.pebble}" stroke="${c.outline}" stroke-width="1"/>` +
+    `<path d="M-4 -2 Q-1 -4 2 -3.5" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.45"/>` +
+    `<circle cx="2.5" cy="2.5" r="1" fill="${c.pebbleShade}"/>`;
+const pebbleSprites = (c) => ({
+    'bp-rest': pebbleShape(c),
+    'bp-tilt-a': `<g transform="rotate(-12)"><use href="#bp-rest"/></g>`,
+    'bp-tilt-b': `<g transform="rotate(12)"><use href="#bp-rest"/></g>`,
+    'bp-crumble': `<path d="M-7 5 l3 -4 l3 4z M-1 6 l3 -5 l3 5z M4 5 l2 -3 l2 3z" fill="${c.pebble}" stroke="${c.outline}" stroke-width="0.8"/>` +
+        `<circle cx="-4" cy="-3" r="0.8" fill="${c.pebbleShade}"/><circle cx="3" cy="-4" r="0.7" fill="${c.pebbleShade}"/>`
+});
+/** Facing left is the right-facing drawing mirrored. */
+const mirrored = (sprites) => {
+    const result = Object.assign({}, sprites);
+    for (const id of Object.keys(sprites)) {
+        if (id.endsWith('-r'))
+            result[`${id.slice(0, -2)}-l`] = `<g transform="scale(-1 1)"><use href="#${id}"/></g>`;
+    }
+    return result;
+};
+/** The <defs> block for every sprite referenced in `usedRefs` (plus whatever those depend on). */
+const buildSpriteDefs = (palette, usedRefs) => {
+    const all = mirrored(Object.assign(Object.assign(Object.assign({}, wombatSprites(palette)), beetleSprites(palette)), pebbleSprites(palette)));
+    const needed = new Set();
+    const include = (id) => {
+        if (needed.has(id) || !all[id])
+            return;
+        needed.add(id);
+        const pattern = /href="#([^"]+)"/g;
+        let match;
+        while ((match = pattern.exec(all[id])) !== null)
+            include(match[1]);
+    };
+    for (const ref of usedRefs)
+        include(ref.replace(/^#/, ''));
+    return `<defs>${[...needed].map((id) => `<g id="${id}">${all[id]}</g>`).join('')}</defs>`;
+};
+
+
+/***/ }),
+
+/***/ "./src/burrow/renderers/svg.ts":
+/*!*************************************!*\
+  !*** ./src/burrow/renderers/svg.ts ***!
+  \*************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Renderer: () => (/* binding */ Renderer),
+/* harmony export */   SVG_KEY_TIMES_PRECISION: () => (/* binding */ SVG_KEY_TIMES_PRECISION)
+/* harmony export */ });
+/* harmony import */ var _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../shared/utils/utils */ "./src/shared/utils/utils.ts");
+/* harmony import */ var _core_constants__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/constants */ "./src/burrow/core/constants.ts");
+/* harmony import */ var _sprites__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./sprites */ "./src/burrow/renderers/sprites.ts");
+
+
+
+const toX = (x) => x * (_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE);
+const toY = (y) => y * (_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_HEADER_HEIGHT;
+const centerOf = ({ x, y }) => `${toX(x) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE / 2} ${toY(y) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE / 2}`;
+const SVG_KEY_TIMES_PRECISION = 4;
+const toKeyTime = (index, totalFrames) => Number((index / (totalFrames - 1)).toFixed(SVG_KEY_TIMES_PRECISION));
+/** Discrete animation that only lists the frames where the value changes. */
+const generateChangingValuesAnimation = (changingValues) => {
+    const totalFrames = changingValues.length;
+    if (totalFrames <= 1)
+        return null;
+    const keyTimes = [];
+    const values = [];
+    let lastValue = null;
+    let lastIndex = null;
+    changingValues.forEach((currentValue, index) => {
+        if (currentValue === lastValue)
+            return;
+        if (lastValue !== null && lastIndex !== null && index - 1 !== lastIndex) {
+            keyTimes.push(Number(((index - 0.1) / (totalFrames - 1)).toFixed(SVG_KEY_TIMES_PRECISION)));
+            values.push(lastValue);
+        }
+        keyTimes.push(toKeyTime(index, totalFrames));
+        values.push(currentValue);
+        lastValue = currentValue;
+        lastIndex = index;
+    });
+    if (values.length <= 1)
+        return null;
+    if (keyTimes[keyTimes.length - 1] !== 1) {
+        keyTimes.push(1);
+        values.push(lastValue !== null && lastValue !== void 0 ? lastValue : changingValues[totalFrames - 1]);
+    }
+    return { keyTimes: keyTimes.join(';'), values: values.join(';') };
+};
+/**
+ * Linear animation for positions: a value holds until the frame before it changes, then glides over one frame,
+ * so sprites slide smoothly from cell to cell instead of jumping.
+ */
+const generateSteppedLinearAnimation = (positions) => {
+    const totalFrames = positions.length;
+    if (totalFrames <= 1)
+        return null;
+    const keyTimes = [];
+    const values = [];
+    const push = (index, value) => {
+        const time = toKeyTime(index, totalFrames);
+        if (keyTimes[keyTimes.length - 1] === time)
+            values[values.length - 1] = value;
+        else {
+            keyTimes.push(time);
+            values.push(value);
+        }
+    };
+    let lastValue = null;
+    let lastIndex = null;
+    positions.forEach((value, index) => {
+        if (value === lastValue)
+            return;
+        if (lastValue !== null && lastIndex !== null && index - 1 !== lastIndex)
+            push(index - 1, lastValue);
+        push(index, value);
+        lastValue = value;
+        lastIndex = index;
+    });
+    if (values.length <= 1)
+        return null;
+    if (keyTimes[keyTimes.length - 1] !== 1)
+        push(totalFrames - 1, positions[totalFrames - 1]);
+    return { keyTimes: keyTimes.join(';'), values: values.join(';') };
+};
+const renderSprite = ({ positions, refs, opacities }, durationMs) => {
+    const animate = (attributeName, anim) => anim
+        ? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
+        : '';
+    const positionAnim = generateSteppedLinearAnimation(positions);
+    if (!opacities.some((o) => o !== '0'))
+        return '';
+    let svg = `<use href="${refs[0]}" opacity="${opacities[0]}" transform="translate(${positions[0]})">`;
+    svg += animate('href', generateChangingValuesAnimation(refs));
+    svg += animate('opacity', generateChangingValuesAnimation(opacities));
+    if (positionAnim) {
+        svg += `<animateTransform attributeName="transform" type="translate" calcMode="linear" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${positionAnim.keyTimes}" values="${positionAnim.values}"/>`;
+    }
+    return svg + `</use>`;
+};
+const buildMonthLabels = (store) => {
+    var _a;
+    if (store.config.showMonthLabels === false)
+        return '';
+    let labels = '';
+    let last = '';
+    const theme = _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__.Utils.getCurrentTheme(store);
+    for (let x = 0; x < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_WIDTH; x++) {
+        const month = (_a = store.monthLabels[x]) !== null && _a !== void 0 ? _a : '';
+        if (!month || month === last)
+            continue;
+        labels += `<text x="${toX(x) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE / 2}" y="16" text-anchor="middle" font-size="10" fill="${theme.textColor}">${month}</text>`;
+        last = month;
+    }
+    return labels;
+};
+const isInSoil = (snapshot, { x, y }) => { var _a, _b; return ((_b = (_a = snapshot.soil[x]) === null || _a === void 0 ? void 0 : _a[y]) !== null && _b !== void 0 ? _b : 0) > 0; };
+const generateAnimatedSVG = (store) => {
+    const theme = _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__.Utils.getCurrentTheme(store);
+    const palette = (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.getBurrowPalette)(store.config.gameTheme);
+    const width = _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_WIDTH * (_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE);
+    const height = _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT * (_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_HEADER_HEIGHT;
+    const totalFrames = Math.max(store.snapshots.length, 1);
+    const durationMs = Math.round(Math.max((totalFrames * _core_constants__WEBPACK_IMPORTED_MODULE_1__.DELTA_TIME) / _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_DURATION_DIVISOR, _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_MIN_DURATION_MS));
+    const snapshots = store.snapshots;
+    const soilColor = (hardness) => (hardness > 0 ? theme.intensityColors[hardness] : palette.tunnel);
+    let cells = '';
+    for (let x = 0; x < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_WIDTH; x++) {
+        for (let y = 0; y < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT; y++) {
+            const fills = snapshots.map((s) => soilColor(s.soil[x][y]));
+            const anim = generateChangingValuesAnimation(fills);
+            cells += `<rect x="${toX(x)}" y="${toY(y)}" width="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE}" height="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE}" rx="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_CELL_RADIUS}" fill="${fills[0]}">`;
+            if (anim) {
+                cells += `<animate attributeName="fill" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`;
+            }
+            cells += `</rect>`;
+        }
+    }
+    const timelines = [
+        ...store.pebbles.map((_, i) => ({
+            positions: snapshots.map((s) => centerOf(s.pebbles[i])),
+            refs: snapshots.map((s) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.pebbleRef)(s.pebbles[i])),
+            opacities: snapshots.map((s) => (s.pebbles[i].state === 'gone' ? '0' : '1'))
+        })),
+        ...store.beetles.map((_, i) => ({
+            positions: snapshots.map((s) => centerOf(s.beetles[i])),
+            refs: snapshots.map((s) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.beetleRef)(s.beetles[i])),
+            // A beetle squeezing through soil is only half there.
+            opacities: snapshots.map((s) => {
+                const beetle = s.beetles[i];
+                if (beetle.state === 'hidden' || beetle.state === 'gone')
+                    return '0';
+                return isInSoil(s, beetle) ? '0.5' : '1';
+            })
+        })),
+        {
+            positions: snapshots.map((s) => centerOf(s.wombat)),
+            refs: snapshots.map((s) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.wombatRef)(s.wombat)),
+            opacities: snapshots.map((s) => (s.wombat.visible ? '1' : '0'))
+        }
+    ];
+    const usedRefs = new Set(timelines.flatMap((t) => t.refs));
+    let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" color-interpolation="sRGB">`;
+    svg += `<desc>Burrow: a wombat digs cozy tunnels through a contribution graph.</desc>`;
+    svg += (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.buildSpriteDefs)(palette, usedRefs);
+    svg += `<rect width="100%" height="100%" fill="${theme.gridBackground}"/>`;
+    svg += buildMonthLabels(store);
+    svg += cells;
+    svg += timelines.map((t) => renderSprite(t, durationMs)).join('');
+    svg += `</svg>`;
+    return svg;
+};
+const Renderer = {
+    generateAnimatedSVG
+};
+
+
+/***/ }),
+
 /***/ "./src/galaga/core/constants.ts":
 /*!**************************************!*\
   !*** ./src/galaga/core/constants.ts ***!
@@ -7839,16 +9003,17 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   ARCADE_GAMES: () => (/* binding */ ARCADE_GAMES),
 /* harmony export */   ArcadeRenderer: () => (/* binding */ ArcadeRenderer),
 /* harmony export */   GAME_REGISTRY: () => (/* binding */ GAME_REGISTRY),
-/* harmony export */   PlayerStyle: () => (/* reexport safe */ _pacman_index__WEBPACK_IMPORTED_MODULE_4__.PlayerStyle)
+/* harmony export */   PlayerStyle: () => (/* reexport safe */ _pacman_index__WEBPACK_IMPORTED_MODULE_5__.PlayerStyle)
 /* harmony export */ });
 /* harmony import */ var _bomberman_index__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../bomberman/index */ "./src/bomberman/index.ts");
 /* harmony import */ var _breakout_index__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../breakout/index */ "./src/breakout/index.ts");
-/* harmony import */ var _galaga_index__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../galaga/index */ "./src/galaga/index.ts");
-/* harmony import */ var _minesweeper_index__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../minesweeper/index */ "./src/minesweeper/index.ts");
-/* harmony import */ var _pacman_index__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../pacman/index */ "./src/pacman/index.ts");
-/* harmony import */ var _puzzle_bobble_index__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../puzzle-bobble/index */ "./src/puzzle-bobble/index.ts");
-/* harmony import */ var _snake_index__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../snake/index */ "./src/snake/index.ts");
-/* harmony import */ var _tetris_index__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../tetris/index */ "./src/tetris/index.ts");
+/* harmony import */ var _burrow_index__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../burrow/index */ "./src/burrow/index.ts");
+/* harmony import */ var _galaga_index__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../galaga/index */ "./src/galaga/index.ts");
+/* harmony import */ var _minesweeper_index__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../minesweeper/index */ "./src/minesweeper/index.ts");
+/* harmony import */ var _pacman_index__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../pacman/index */ "./src/pacman/index.ts");
+/* harmony import */ var _puzzle_bobble_index__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../puzzle-bobble/index */ "./src/puzzle-bobble/index.ts");
+/* harmony import */ var _snake_index__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../snake/index */ "./src/snake/index.ts");
+/* harmony import */ var _tetris_index__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../tetris/index */ "./src/tetris/index.ts");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -7867,10 +9032,11 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 
 
 
+
 const gameRegistry = {
     pacman: {
         label: '👻 Pac-Man',
-        factory: (conf) => new _pacman_index__WEBPACK_IMPORTED_MODULE_4__.PacmanRenderer(conf)
+        factory: (conf) => new _pacman_index__WEBPACK_IMPORTED_MODULE_5__.PacmanRenderer(conf)
     },
     breakout: {
         label: '🧱 Breakout',
@@ -7878,11 +9044,11 @@ const gameRegistry = {
     },
     galaga: {
         label: '🚀 Galaga',
-        factory: (conf) => new _galaga_index__WEBPACK_IMPORTED_MODULE_2__.GalagaRenderer(conf)
+        factory: (conf) => new _galaga_index__WEBPACK_IMPORTED_MODULE_3__.GalagaRenderer(conf)
     },
     'puzzle-bobble': {
         label: '🫧 Puzzle Bobble',
-        factory: (conf) => new _puzzle_bobble_index__WEBPACK_IMPORTED_MODULE_5__.PuzzleBobbleRenderer(conf)
+        factory: (conf) => new _puzzle_bobble_index__WEBPACK_IMPORTED_MODULE_6__.PuzzleBobbleRenderer(conf)
     },
     bomberman: {
         label: '💣 Bomberman',
@@ -7890,15 +9056,19 @@ const gameRegistry = {
     },
     minesweeper: {
         label: '💠 Minesweeper',
-        factory: (conf) => new _minesweeper_index__WEBPACK_IMPORTED_MODULE_3__.MinesweeperRenderer(conf)
+        factory: (conf) => new _minesweeper_index__WEBPACK_IMPORTED_MODULE_4__.MinesweeperRenderer(conf)
     },
     snake: {
         label: '🐍 Snake',
-        factory: (conf) => new _snake_index__WEBPACK_IMPORTED_MODULE_6__.SnakeRenderer(conf)
+        factory: (conf) => new _snake_index__WEBPACK_IMPORTED_MODULE_7__.SnakeRenderer(conf)
     },
     tetris: {
         label: '🟪 Tetris',
-        factory: (conf) => new _tetris_index__WEBPACK_IMPORTED_MODULE_7__.TetrisRenderer(conf)
+        factory: (conf) => new _tetris_index__WEBPACK_IMPORTED_MODULE_8__.TetrisRenderer(conf)
+    },
+    burrow: {
+        label: '🐾 Burrow',
+        factory: (conf) => new _burrow_index__WEBPACK_IMPORTED_MODULE_2__.BurrowRenderer(conf)
     }
 };
 const GAME_REGISTRY = gameRegistry;
@@ -9952,37 +11122,40 @@ var __webpack_exports__ = {};
   \**********************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   ARCADE_GAMES: () => (/* reexport safe */ _shared_arcade_renderer__WEBPACK_IMPORTED_MODULE_6__.ARCADE_GAMES),
-/* harmony export */   ArcadeRenderer: () => (/* reexport safe */ _shared_arcade_renderer__WEBPACK_IMPORTED_MODULE_6__.ArcadeRenderer),
+/* harmony export */   ARCADE_GAMES: () => (/* reexport safe */ _shared_arcade_renderer__WEBPACK_IMPORTED_MODULE_7__.ARCADE_GAMES),
+/* harmony export */   ArcadeRenderer: () => (/* reexport safe */ _shared_arcade_renderer__WEBPACK_IMPORTED_MODULE_7__.ArcadeRenderer),
 /* harmony export */   BombermanRenderer: () => (/* reexport safe */ _bomberman_index__WEBPACK_IMPORTED_MODULE_0__.BombermanRenderer),
 /* harmony export */   BreakoutRenderer: () => (/* reexport safe */ _breakout_index__WEBPACK_IMPORTED_MODULE_1__.BreakoutRenderer),
-/* harmony export */   GAME_REGISTRY: () => (/* reexport safe */ _shared_arcade_renderer__WEBPACK_IMPORTED_MODULE_6__.GAME_REGISTRY),
-/* harmony export */   GalagaRenderer: () => (/* reexport safe */ _galaga_index__WEBPACK_IMPORTED_MODULE_2__.GalagaRenderer),
-/* harmony export */   MinesweeperRenderer: () => (/* reexport safe */ _minesweeper_index__WEBPACK_IMPORTED_MODULE_3__.MinesweeperRenderer),
-/* harmony export */   PLATFORMS: () => (/* reexport safe */ _shared_types__WEBPACK_IMPORTED_MODULE_8__.PLATFORMS),
-/* harmony export */   PLATFORM_REGISTRY: () => (/* reexport safe */ _shared_types__WEBPACK_IMPORTED_MODULE_8__.PLATFORM_REGISTRY),
-/* harmony export */   PacmanRenderer: () => (/* reexport safe */ _pacman_index__WEBPACK_IMPORTED_MODULE_4__.PacmanRenderer),
-/* harmony export */   PlayerStyle: () => (/* reexport safe */ _pacman_index__WEBPACK_IMPORTED_MODULE_4__.PlayerStyle),
-/* harmony export */   PuzzleBobbleRenderer: () => (/* reexport safe */ _puzzle_bobble_index__WEBPACK_IMPORTED_MODULE_5__.PuzzleBobbleRenderer),
-/* harmony export */   SCENARIOS: () => (/* reexport safe */ _shared_types__WEBPACK_IMPORTED_MODULE_8__.SCENARIOS),
-/* harmony export */   SCENARIO_REGISTRY: () => (/* reexport safe */ _shared_types__WEBPACK_IMPORTED_MODULE_8__.SCENARIO_REGISTRY),
-/* harmony export */   SnakeRenderer: () => (/* reexport safe */ _snake_index__WEBPACK_IMPORTED_MODULE_9__.SnakeRenderer),
-/* harmony export */   TetrisRenderer: () => (/* reexport safe */ _tetris_index__WEBPACK_IMPORTED_MODULE_10__.TetrisRenderer),
-/* harmony export */   generateScenarioContributions: () => (/* reexport safe */ _shared_providers_scenarios__WEBPACK_IMPORTED_MODULE_7__.generateScenarioContributions),
-/* harmony export */   isScenarioName: () => (/* reexport safe */ _shared_providers_scenarios__WEBPACK_IMPORTED_MODULE_7__.isScenarioName),
-/* harmony export */   resolveScenarioName: () => (/* reexport safe */ _shared_providers_scenarios__WEBPACK_IMPORTED_MODULE_7__.resolveScenarioName)
+/* harmony export */   BurrowRenderer: () => (/* reexport safe */ _burrow_index__WEBPACK_IMPORTED_MODULE_2__.BurrowRenderer),
+/* harmony export */   GAME_REGISTRY: () => (/* reexport safe */ _shared_arcade_renderer__WEBPACK_IMPORTED_MODULE_7__.GAME_REGISTRY),
+/* harmony export */   GalagaRenderer: () => (/* reexport safe */ _galaga_index__WEBPACK_IMPORTED_MODULE_3__.GalagaRenderer),
+/* harmony export */   MinesweeperRenderer: () => (/* reexport safe */ _minesweeper_index__WEBPACK_IMPORTED_MODULE_4__.MinesweeperRenderer),
+/* harmony export */   PLATFORMS: () => (/* reexport safe */ _shared_types__WEBPACK_IMPORTED_MODULE_9__.PLATFORMS),
+/* harmony export */   PLATFORM_REGISTRY: () => (/* reexport safe */ _shared_types__WEBPACK_IMPORTED_MODULE_9__.PLATFORM_REGISTRY),
+/* harmony export */   PacmanRenderer: () => (/* reexport safe */ _pacman_index__WEBPACK_IMPORTED_MODULE_5__.PacmanRenderer),
+/* harmony export */   PlayerStyle: () => (/* reexport safe */ _pacman_index__WEBPACK_IMPORTED_MODULE_5__.PlayerStyle),
+/* harmony export */   PuzzleBobbleRenderer: () => (/* reexport safe */ _puzzle_bobble_index__WEBPACK_IMPORTED_MODULE_6__.PuzzleBobbleRenderer),
+/* harmony export */   SCENARIOS: () => (/* reexport safe */ _shared_types__WEBPACK_IMPORTED_MODULE_9__.SCENARIOS),
+/* harmony export */   SCENARIO_REGISTRY: () => (/* reexport safe */ _shared_types__WEBPACK_IMPORTED_MODULE_9__.SCENARIO_REGISTRY),
+/* harmony export */   SnakeRenderer: () => (/* reexport safe */ _snake_index__WEBPACK_IMPORTED_MODULE_10__.SnakeRenderer),
+/* harmony export */   TetrisRenderer: () => (/* reexport safe */ _tetris_index__WEBPACK_IMPORTED_MODULE_11__.TetrisRenderer),
+/* harmony export */   generateScenarioContributions: () => (/* reexport safe */ _shared_providers_scenarios__WEBPACK_IMPORTED_MODULE_8__.generateScenarioContributions),
+/* harmony export */   isScenarioName: () => (/* reexport safe */ _shared_providers_scenarios__WEBPACK_IMPORTED_MODULE_8__.isScenarioName),
+/* harmony export */   resolveScenarioName: () => (/* reexport safe */ _shared_providers_scenarios__WEBPACK_IMPORTED_MODULE_8__.resolveScenarioName)
 /* harmony export */ });
 /* harmony import */ var _bomberman_index__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./bomberman/index */ "./src/bomberman/index.ts");
 /* harmony import */ var _breakout_index__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./breakout/index */ "./src/breakout/index.ts");
-/* harmony import */ var _galaga_index__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./galaga/index */ "./src/galaga/index.ts");
-/* harmony import */ var _minesweeper_index__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./minesweeper/index */ "./src/minesweeper/index.ts");
-/* harmony import */ var _pacman_index__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pacman/index */ "./src/pacman/index.ts");
-/* harmony import */ var _puzzle_bobble_index__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./puzzle-bobble/index */ "./src/puzzle-bobble/index.ts");
-/* harmony import */ var _shared_arcade_renderer__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./shared/arcade-renderer */ "./src/shared/arcade-renderer.ts");
-/* harmony import */ var _shared_providers_scenarios__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./shared/providers/scenarios */ "./src/shared/providers/scenarios.ts");
-/* harmony import */ var _shared_types__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./shared/types */ "./src/shared/types.ts");
-/* harmony import */ var _snake_index__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./snake/index */ "./src/snake/index.ts");
-/* harmony import */ var _tetris_index__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./tetris/index */ "./src/tetris/index.ts");
+/* harmony import */ var _burrow_index__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./burrow/index */ "./src/burrow/index.ts");
+/* harmony import */ var _galaga_index__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./galaga/index */ "./src/galaga/index.ts");
+/* harmony import */ var _minesweeper_index__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./minesweeper/index */ "./src/minesweeper/index.ts");
+/* harmony import */ var _pacman_index__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pacman/index */ "./src/pacman/index.ts");
+/* harmony import */ var _puzzle_bobble_index__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./puzzle-bobble/index */ "./src/puzzle-bobble/index.ts");
+/* harmony import */ var _shared_arcade_renderer__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./shared/arcade-renderer */ "./src/shared/arcade-renderer.ts");
+/* harmony import */ var _shared_providers_scenarios__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./shared/providers/scenarios */ "./src/shared/providers/scenarios.ts");
+/* harmony import */ var _shared_types__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./shared/types */ "./src/shared/types.ts");
+/* harmony import */ var _snake_index__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./snake/index */ "./src/snake/index.ts");
+/* harmony import */ var _tetris_index__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./tetris/index */ "./src/tetris/index.ts");
+
 
 
 
@@ -10001,6 +11174,7 @@ var __webpack_exports__ARCADE_GAMES = __webpack_exports__.ARCADE_GAMES;
 var __webpack_exports__ArcadeRenderer = __webpack_exports__.ArcadeRenderer;
 var __webpack_exports__BombermanRenderer = __webpack_exports__.BombermanRenderer;
 var __webpack_exports__BreakoutRenderer = __webpack_exports__.BreakoutRenderer;
+var __webpack_exports__BurrowRenderer = __webpack_exports__.BurrowRenderer;
 var __webpack_exports__GAME_REGISTRY = __webpack_exports__.GAME_REGISTRY;
 var __webpack_exports__GalagaRenderer = __webpack_exports__.GalagaRenderer;
 var __webpack_exports__MinesweeperRenderer = __webpack_exports__.MinesweeperRenderer;
@@ -10016,6 +11190,6 @@ var __webpack_exports__TetrisRenderer = __webpack_exports__.TetrisRenderer;
 var __webpack_exports__generateScenarioContributions = __webpack_exports__.generateScenarioContributions;
 var __webpack_exports__isScenarioName = __webpack_exports__.isScenarioName;
 var __webpack_exports__resolveScenarioName = __webpack_exports__.resolveScenarioName;
-export { __webpack_exports__ARCADE_GAMES as ARCADE_GAMES, __webpack_exports__ArcadeRenderer as ArcadeRenderer, __webpack_exports__BombermanRenderer as BombermanRenderer, __webpack_exports__BreakoutRenderer as BreakoutRenderer, __webpack_exports__GAME_REGISTRY as GAME_REGISTRY, __webpack_exports__GalagaRenderer as GalagaRenderer, __webpack_exports__MinesweeperRenderer as MinesweeperRenderer, __webpack_exports__PLATFORMS as PLATFORMS, __webpack_exports__PLATFORM_REGISTRY as PLATFORM_REGISTRY, __webpack_exports__PacmanRenderer as PacmanRenderer, __webpack_exports__PlayerStyle as PlayerStyle, __webpack_exports__PuzzleBobbleRenderer as PuzzleBobbleRenderer, __webpack_exports__SCENARIOS as SCENARIOS, __webpack_exports__SCENARIO_REGISTRY as SCENARIO_REGISTRY, __webpack_exports__SnakeRenderer as SnakeRenderer, __webpack_exports__TetrisRenderer as TetrisRenderer, __webpack_exports__generateScenarioContributions as generateScenarioContributions, __webpack_exports__isScenarioName as isScenarioName, __webpack_exports__resolveScenarioName as resolveScenarioName };
+export { __webpack_exports__ARCADE_GAMES as ARCADE_GAMES, __webpack_exports__ArcadeRenderer as ArcadeRenderer, __webpack_exports__BombermanRenderer as BombermanRenderer, __webpack_exports__BreakoutRenderer as BreakoutRenderer, __webpack_exports__BurrowRenderer as BurrowRenderer, __webpack_exports__GAME_REGISTRY as GAME_REGISTRY, __webpack_exports__GalagaRenderer as GalagaRenderer, __webpack_exports__MinesweeperRenderer as MinesweeperRenderer, __webpack_exports__PLATFORMS as PLATFORMS, __webpack_exports__PLATFORM_REGISTRY as PLATFORM_REGISTRY, __webpack_exports__PacmanRenderer as PacmanRenderer, __webpack_exports__PlayerStyle as PlayerStyle, __webpack_exports__PuzzleBobbleRenderer as PuzzleBobbleRenderer, __webpack_exports__SCENARIOS as SCENARIOS, __webpack_exports__SCENARIO_REGISTRY as SCENARIO_REGISTRY, __webpack_exports__SnakeRenderer as SnakeRenderer, __webpack_exports__TetrisRenderer as TetrisRenderer, __webpack_exports__generateScenarioContributions as generateScenarioContributions, __webpack_exports__isScenarioName as isScenarioName, __webpack_exports__resolveScenarioName as resolveScenarioName };
 
 //# sourceMappingURL=pacman-contribution-graph.js.map
