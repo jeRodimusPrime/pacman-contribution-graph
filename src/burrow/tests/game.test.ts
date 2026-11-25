@@ -15,6 +15,7 @@ import {
 } from '../core/constants';
 import { findLanternTarget, planWombatPath, simulate } from '../core/game';
 import { Store } from '../core/store';
+import { crumbleStage } from '../renderers/sprites';
 import { Renderer } from '../renderers/svg';
 import { Beetle, BurrowSnapshot, BurrowStore } from '../types';
 
@@ -271,6 +272,31 @@ describe('burrow svg', () => {
 		const defined = new Set([...svg.matchAll(/<g id="([^"]+)"/g)].map((m) => m[1]));
 		const referenced = new Set([...svg.matchAll(/#(b[wbp]-[a-z0-9-]+)/g)].map((m) => m[1]));
 		for (const id of referenced) expect(defined).toContain(id);
+	});
+
+	it('maps dig progress to crumble stages', () => {
+		expect([4, 3, 2, 1, 0].map((h) => crumbleStage(4, h))).toEqual([0, 1, 2, 3, 0]);
+		expect([3, 2, 1, 0].map((h) => crumbleStage(3, h))).toEqual([0, 1, 2, 0]);
+		expect([2, 1, 0].map((h) => crumbleStage(2, h))).toEqual([0, 2, 0]);
+		expect([1, 0].map((h) => crumbleStage(1, h))).toEqual([0, 0]);
+	});
+
+	it('crumbles a dense day through every stage while it is dug', () => {
+		const store = createStoreWithLevels([{ x: 0, y: BURROW_DEN.y, level: 4 }]);
+		simulate(store);
+		const svg = Renderer.generateAnimatedSVG(store);
+
+		const crumbleHref = svg.match(/<use href="#bc-1"[^>]*><animate attributeName="href"[^>]*values="([^"]+)"/);
+		expect(crumbleHref).not.toBeNull();
+		const stages = (crumbleHref as RegExpMatchArray)[1].split(';').filter((v, i, all) => v !== all[i - 1]);
+		expect(stages).toEqual(['#bc-1', '#bc-2', '#bc-3']);
+		expect(svg).toContain('<clipPath id="bc-clip">');
+	});
+
+	it('opens light days in a single scrape, without crumbling', () => {
+		const store = createStoreWithLevels([{ x: 0, y: BURROW_DEN.y, level: 1 }]);
+		simulate(store);
+		expect(Renderer.generateAnimatedSVG(store)).not.toContain('#bc-');
 	});
 
 	it('uses warm tunnels and the theme palette for soil', () => {

@@ -12,7 +12,7 @@ import {
 	GRID_WIDTH
 } from '../core/constants';
 import { BurrowSnapshot, BurrowStore, Position } from '../types';
-import { beetleRef, buildSpriteDefs, getBurrowPalette, pebbleRef, wombatRef } from './sprites';
+import { beetleRef, buildSpriteDefs, crumbleRef, crumbleStage, getBurrowPalette, pebbleRef, wombatRef } from './sprites';
 
 const toX = (x: number) => x * (CELL_SIZE + GAP_SIZE);
 const toY = (y: number) => y * (CELL_SIZE + GAP_SIZE) + BURROW_HEADER_HEIGHT;
@@ -99,7 +99,6 @@ const renderSprite = ({ positions, refs, opacities }: SpriteTimeline, durationMs
 			: '';
 	const positionAnim = generateSteppedLinearAnimation(positions);
 
-	if (!opacities.some((o) => o !== '0')) return '';
 	let svg = `<use href="${refs[0]}" opacity="${opacities[0]}" transform="translate(${positions[0]})">`;
 	svg += animate('href', generateChangingValuesAnimation(refs));
 	svg += animate('opacity', generateChangingValuesAnimation(opacities));
@@ -121,6 +120,51 @@ const buildMonthLabels = (store: BurrowStore) => {
 		last = month;
 	}
 	return labels;
+};
+
+/** At most this many half-dug cells crumble at once; the wombat digs one at a time, so one spare is plenty. */
+const CRUMBLE_SLOTS = 2;
+
+interface CrumbleFrame {
+	position: Position;
+	stage: number;
+}
+
+/**
+ * Crumble overlays for every frame, one timeline per slot. A cell keeps the same slot for as long as it is
+ * half-dug, so its overlay never jumps between slots mid-crumble.
+ */
+const buildCrumbleTimelines = (store: BurrowStore): SpriteTimeline[] => {
+	const slots: (CrumbleFrame | null)[][] = Array.from({ length: CRUMBLE_SLOTS }, () => []);
+	let assigned: (string | null)[] = Array(CRUMBLE_SLOTS).fill(null);
+
+	for (const snapshot of store.snapshots) {
+		const crumbling = new Map<string, CrumbleFrame>();
+		for (let x = 0; x < GRID_WIDTH; x++) {
+			for (let y = 0; y < GRID_HEIGHT; y++) {
+				const stage = crumbleStage(store.initialSoil[x]?.[y] ?? 0, snapshot.soil[x][y]);
+				if (stage > 0) crumbling.set(`${x}:${y}`, { position: { x, y }, stage });
+			}
+		}
+		assigned = assigned.map((key) => (key !== null && crumbling.has(key) ? key : null));
+		for (const key of crumbling.keys()) {
+			if (assigned.includes(key)) continue;
+			const free = assigned.indexOf(null);
+			if (free >= 0) assigned[free] = key;
+		}
+		assigned.forEach((key, slot) => slots[slot].push(key === null ? null : (crumbling.get(key) as CrumbleFrame)));
+	}
+
+	return slots.map((frames) => {
+		// An idle slot stays where it last was (hidden) so it never slides across the board.
+		let last: CrumbleFrame = frames.find((f) => f !== null) ?? { position: { x: 0, y: 0 }, stage: 1 };
+		const filled = frames.map((f) => (f ? (last = f) : last));
+		return {
+			positions: filled.map((f) => centerOf(f.position)),
+			refs: filled.map((f) => crumbleRef(f.stage)),
+			opacities: frames.map((f) => (f ? '1' : '0'))
+		};
+	});
 };
 
 const isInSoil = (snapshot: BurrowSnapshot, { x, y }: Position) => (snapshot.soil[x]?.[y] ?? 0) > 0;
@@ -150,6 +194,7 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 	}
 
 	const timelines: SpriteTimeline[] = [
+		...buildCrumbleTimelines(store),
 		...store.pebbles.map((_, i) => ({
 			positions: snapshots.map((s) => centerOf(s.pebbles[i])),
 			refs: snapshots.map((s) => pebbleRef(s.pebbles[i])),
@@ -172,7 +217,9 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 		}
 	];
 
-	const usedRefs = new Set(timelines.flatMap((t) => t.refs));
+	// Sprites that never show (an unused crumble slot, say) are neither drawn nor defined.
+	const visible = timelines.filter((t) => t.opacities.some((o) => o !== '0'));
+	const usedRefs = new Set(visible.flatMap((t) => t.refs));
 
 	let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" color-interpolation="sRGB">`;
 	svg += `<desc>Burrow: a wombat digs cozy tunnels through a contribution graph.</desc>`;
@@ -180,7 +227,7 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 	svg += `<rect width="100%" height="100%" fill="${theme.gridBackground}"/>`;
 	svg += buildMonthLabels(store);
 	svg += cells;
-	svg += timelines.map((t) => renderSprite(t, durationMs)).join('');
+	svg += visible.map((t) => renderSprite(t, durationMs)).join('');
 	svg += `</svg>`;
 	return svg;
 };

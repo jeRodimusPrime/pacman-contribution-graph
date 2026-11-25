@@ -222,6 +222,56 @@ const pebbleSprites = (c: BurrowPalette): Record<string, string> => ({
 		`<circle cx="-4" cy="-3" r="0.8" fill="${c.pebbleShade}"/><circle cx="3" cy="-4" r="0.7" fill="${c.pebbleShade}"/>`
 });
 
+/* ───────────────────────── Crumbling soil ───────────────────────── */
+
+/** Number of crumble stages drawn over a cell while it is being dug. */
+export const CRUMBLE_STAGES = 3;
+
+/**
+ * Crumble stage (1…CRUMBLE_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
+ * cell is untouched or fully dug. A level-4 day goes through every stage; a level-1 day opens in one scrape.
+ */
+export const crumbleStage = (initial: number, remaining: number) =>
+	remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * CRUMBLE_STAGES - 1e-9);
+
+export const crumbleRef = (stage: number) => `#bc-${stage}`;
+
+/** Clip so holes punched near a corner follow the cell's rounded edge. */
+const CRUMBLE_CLIP = `<clipPath id="bc-clip"><rect x="-10" y="-10" width="20" height="20" rx="3"/></clipPath>`;
+
+/**
+ * Holes are painted in the tunnel colour, so whatever is left of the cell keeps its current soil shade
+ * underneath. Each stage keeps the holes of the one before, so the soil only ever falls away.
+ */
+const crumbleSprites = (c: BurrowPalette): Record<string, string> => {
+	const hole = (d: string) => `<path d="${d}" fill="${c.tunnel}"/>`;
+	const crack = (d: string) =>
+		`<path d="${d}" fill="none" stroke="${c.outline}" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>`;
+	const crumb = (x: number, y: number, r: number) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c.tunnel}"/>`;
+
+	const stage1 =
+		hole('M4 -10 L10 -10 L10 -4 L7 -5 L5 -7Z') +
+		crack('M-6 -10 L-3 -4 L-6 1 M4 10 L2 5 L5 1 M5 -7 L1 -5') +
+		crumb(-1, -7, 0.9) +
+		crumb(7, 2, 0.7);
+	const stage2 =
+		stage1 +
+		hole('M-10 3 L-5 2 L-3 6 L-4 10 L-10 10Z') +
+		hole('M-3 -4 L2 -5 L3 -1 L-1 1Z') +
+		crack('M-3 6 L1 3 L3 -1 M-10 -3 L-6 1') +
+		crumb(5, 6, 1) +
+		crumb(-7, -4, 0.8);
+	const stage3 =
+		hole('M-10 -5 L-5 -10 L5 -10 L10 -2 L10 5 L5 10 L-5 10 L-10 4Z') +
+		crack('M-10 -5 L-5 -10 M10 5 L5 10') +
+		`<circle cx="-2" cy="1" r="1.4" fill="${c.outline}" opacity="0.25"/>` +
+		`<circle cx="3" cy="4" r="1" fill="${c.outline}" opacity="0.25"/>` +
+		`<circle cx="1" cy="-4" r="0.8" fill="${c.outline}" opacity="0.25"/>`;
+
+	const clipped = (body: string) => `<g clip-path="url(#bc-clip)">${body}</g>`;
+	return { 'bc-1': clipped(stage1), 'bc-2': clipped(stage2), 'bc-3': clipped(stage3) };
+};
+
 /** Facing left is the right-facing drawing mirrored. */
 const mirrored = (sprites: Record<string, string>): Record<string, string> => {
 	const result: Record<string, string> = { ...sprites };
@@ -233,7 +283,7 @@ const mirrored = (sprites: Record<string, string>): Record<string, string> => {
 
 /** The <defs> block for every sprite referenced in `usedRefs` (plus whatever those depend on). */
 export const buildSpriteDefs = (palette: BurrowPalette, usedRefs: Set<string>): string => {
-	const all = mirrored({ ...wombatSprites(palette), ...beetleSprites(palette), ...pebbleSprites(palette) });
+	const all = mirrored({ ...wombatSprites(palette), ...beetleSprites(palette), ...pebbleSprites(palette), ...crumbleSprites(palette) });
 	const needed = new Set<string>();
 	const include = (id: string) => {
 		if (needed.has(id) || !all[id]) return;
@@ -243,5 +293,6 @@ export const buildSpriteDefs = (palette: BurrowPalette, usedRefs: Set<string>): 
 		while ((match = pattern.exec(all[id])) !== null) include(match[1]);
 	};
 	for (const ref of usedRefs) include(ref.replace(/^#/, ''));
-	return `<defs>${[...needed].map((id) => `<g id="${id}">${all[id]}</g>`).join('')}</defs>`;
+	const clip = [...needed].some((id) => id.startsWith('bc-')) ? CRUMBLE_CLIP : '';
+	return `<defs>${clip}${[...needed].map((id) => `<g id="${id}">${all[id]}</g>`).join('')}</defs>`;
 };
