@@ -1,5 +1,5 @@
 import { GAME_THEMES, GRID_HEIGHT, GRID_WIDTH } from '../../shared/constants';
-import { ARCADE_GAMES } from '../../shared/arcade-renderer';
+import { ARCADE_GAMES, ArcadeRenderer } from '../../shared/arcade-renderer';
 import { generateScenarioContributions } from '../../shared/providers/scenarios';
 import { ContributionLevel, GridCell, ThemeKeys } from '../../shared/types';
 import { Utils } from '../../shared/utils/utils';
@@ -15,9 +15,11 @@ import {
 	BURROW_NAP_END_FRAMES,
 	BURROW_REGROW_FRAMES
 } from '../core/constants';
-import { findHumTarget, planWombatPath, simulate } from '../core/game';
+import { simulate } from '../core/game';
+import { createRandom } from '../core/random';
 import { Store } from '../core/store';
-import { crumbleStage, Renderer } from '../renderers/svg';
+import { findHumTarget, planWombatPath } from '../entities/wombat';
+import { Renderer, shrinkStage } from '../renderers/svg';
 import { Beetle, BurrowSnapshot, BurrowStore } from '../types';
 
 const LEVELS: ContributionLevel[] = ['NONE', 'FIRST_QUARTILE', 'SECOND_QUARTILE', 'THIRD_QUARTILE', 'FOURTH_QUARTILE'];
@@ -65,9 +67,42 @@ const soilLeft = (snapshot: BurrowSnapshot) => snapshot.soil.flat().filter((h) =
 /** The last snapshot before the ending sequence starts. */
 const lastPlayedSnapshot = (store: BurrowStore) => store.snapshots[store.snapshots.length - ENDING_FRAMES - 1];
 
+// The `random` scenario uses Math.random; seed it so every run of these tests sees the same graphs.
+beforeEach(() => {
+	jest.spyOn(Math, 'random').mockImplementation(createRandom(20261125));
+});
+
+afterEach(() => {
+	jest.restoreAllMocks();
+});
+
 describe('burrow registration', () => {
 	it('is selectable as an arcade game', () => {
 		expect(ARCADE_GAMES).toContain('burrow');
+	});
+
+	it('renders end to end through ArcadeRenderer, as the CLI and the Action do', async () => {
+		const svgCallback = jest.fn();
+		const gameStatsCallback = jest.fn();
+		const gameOverCallback = jest.fn();
+		await new ArcadeRenderer({
+			game: 'burrow',
+			platform: 'scenario',
+			scenario: 'streaks',
+			username: 'demo',
+			gameTheme: 'github-dark',
+			svgCallback,
+			gameStatsCallback,
+			gameOverCallback,
+			pointsIncreasedCallback: () => {}
+		}).start();
+
+		expect(svgCallback).toHaveBeenCalledTimes(1);
+		expect(svgCallback.mock.calls[0][0]).toMatch(/^<svg[\s\S]*<\/svg>$/);
+		expect(gameStatsCallback).toHaveBeenCalledWith(
+			expect.objectContaining({ totalScore: expect.any(Number), steps: expect.any(Number) })
+		);
+		expect(gameOverCallback).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -298,11 +333,11 @@ describe('burrow svg', () => {
 		for (const id of referenced) expect(defined).toContain(id);
 	});
 
-	it('maps dig progress to crumble stages', () => {
-		expect([4, 3, 2, 1, 0].map((h) => crumbleStage(4, h))).toEqual([0, 1, 2, 3, 0]);
-		expect([3, 2, 1, 0].map((h) => crumbleStage(3, h))).toEqual([0, 1, 2, 0]);
-		expect([2, 1, 0].map((h) => crumbleStage(2, h))).toEqual([0, 2, 0]);
-		expect([1, 0].map((h) => crumbleStage(1, h))).toEqual([0, 0]);
+	it('maps dig progress to shrink stages', () => {
+		expect([4, 3, 2, 1, 0].map((h) => shrinkStage(4, h))).toEqual([0, 1, 2, 3, 0]);
+		expect([3, 2, 1, 0].map((h) => shrinkStage(3, h))).toEqual([0, 1, 2, 0]);
+		expect([2, 1, 0].map((h) => shrinkStage(2, h))).toEqual([0, 2, 0]);
+		expect([1, 0].map((h) => shrinkStage(1, h))).toEqual([0, 0]);
 	});
 
 	it('shrinks a dense day step by step while it is dug', () => {

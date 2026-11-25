@@ -46,10 +46,18 @@ export const BURROW_BEETLE_PATIENCE = 8;
 export const BURROW_BEETLE_CHASE_RANGE = 14;
 export const BURROW_BEETLE_APPEAR_FRAME = 3;
 export const BURROW_MAX_BEETLES = 4;
+/** One beetle, plus one more for every this many soil cells (up to BURROW_MAX_BEETLES). */
+export const BURROW_SOIL_PER_BEETLE = 90;
+/** An empty graph has nothing to dig, so a couple of beetles still turn up to be sung to. */
+export const BURROW_EMPTY_GRAPH_BEETLES = 2;
 /** Beetles start no closer to the den than this column. */
 export const BURROW_BEETLE_MIN_X = 14;
 
 export const BURROW_MAX_PEBBLES = 5;
+/** One pebble for every this many soil cells (up to BURROW_MAX_PEBBLES). */
+export const BURROW_SOIL_PER_PEBBLE = 30;
+/** Pebbles stay clear of the first few columns, so the wombat is never greeted by one at the den. */
+export const BURROW_PEBBLE_MIN_X = 2;
 /** Minimum number of columns between two pebbles. */
 export const BURROW_PEBBLE_SPACING = 5;
 export const BURROW_PEBBLE_WOBBLE_FRAMES = 3;

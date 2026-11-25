@@ -1,3 +1,4 @@
+import { createWombat } from '../entities/wombat';
 import { BurrowConfig, BurrowStore } from '../types';
 
 export const Store: BurrowStore = {
@@ -9,17 +10,7 @@ export const Store: BurrowStore = {
 	frameCount: 0,
 	soil: [],
 	initialSoil: [],
-	wombat: {
-		x: -1,
-		y: 3,
-		facing: 'right',
-		pose: 'walk',
-		digPhase: 0,
-		humCooldown: 0,
-		humHold: 0,
-		humTarget: null,
-		visible: true
-	},
+	wombat: createWombat(),
 	beetles: [],
 	pebbles: [],
 	snapshots: [],

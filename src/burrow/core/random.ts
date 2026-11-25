@@ -11,3 +11,13 @@ export const createRandom = (seed: number) => {
 };
 
 export type Random = ReturnType<typeof createRandom>;
+
+/** A shuffled copy of `items` (Fisher–Yates), driven by `random` so it is repeatable. */
+export const shuffle = <T>(items: readonly T[], random: Random): T[] => {
+	const result = [...items];
+	for (let i = result.length - 1; i > 0; i--) {
+		const j = Math.floor(random() * (i + 1));
+		[result[i], result[j]] = [result[j], result[i]];
+	}
+	return result;
+};

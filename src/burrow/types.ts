@@ -18,7 +18,7 @@ export type WombatPose = 'walk' | 'dig' | 'hum' | 'sleep';
 export interface Wombat extends Position {
 	facing: Facing;
 	pose: WombatPose;
-	/** Alternates every dig or hum frame, so the claws scrabble and the notes bob. */
+	/** Alternates every dig frame, so the claws visibly scrabble. */
 	digPhase: number;
 	/** Frames until the wombat can hum the next note. */
 	humCooldown: number;

@@ -20,6 +20,26 @@ const PITCH = CELL_SIZE + GAP_SIZE;
 const FIELD_TOP = BURROW_HEADER_HEIGHT;
 const FIELD_HEIGHT = GRID_HEIGHT * PITCH;
 
+/** How the soil layer looks. Tweak these to change the feel without touching the filter itself. */
+const SOIL_LOOK = {
+	/** After the clump blur, alpha is mapped to `alpha * slope + offset`: a hard edge where the blurred alpha is
+	 * about 0.45, so soil keeps roughly its cell shape but with rounded corners and walls. */
+	clumpAlphaSlope: 18,
+	clumpAlphaOffset: -8,
+	/** Grain: noise is mapped to `noise * slope + offset` as the alpha of dark specks (most noise stays below 0). */
+	grainSlope: 1.4,
+	grainOffset: -0.74,
+	/** The tunnel floor gets the same grain at this fraction of the strength. */
+	floorGrainStrength: 0.3,
+	/** The shadow the soil casts down into the tunnels. */
+	shadowBlur: 1.2,
+	shadowDrop: 2.2,
+	shadowOpacity: 0.3,
+	/** The light caught along the top edge of the soil. */
+	rimDepth: 1.4,
+	rimOpacity: 0.22
+};
+
 /**
  * The soil is one continuous layer of earth with open tunnels carved through it:
  * - a small blur followed by an alpha threshold rounds the soil into soft clods, so neighbouring days run
@@ -28,38 +48,42 @@ const FIELD_HEIGHT = GRID_HEIGHT * PITCH;
  * - the soil casts a short shadow down into the tunnels and catches a little light on its top edges,
  *   so the tunnels read as carved out of it rather than painted on.
  */
-const buildSoilDefs = (width: number) =>
-	`<filter id="burrow-soil" filterUnits="userSpaceOnUse" x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" color-interpolation-filters="sRGB">` +
-	`<feGaussianBlur in="SourceGraphic" stdDeviation="${BURROW_SOIL_CLUMP}" result="soft"/>` +
-	`<feColorMatrix in="soft" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 18 -8" result="clump"/>` +
-	`<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>` +
-	`<feColorMatrix in="noise" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 0 0 0 -0.74" result="specks"/>` +
-	`<feComposite in="specks" in2="clump" operator="in" result="soilGrain"/>` +
-	`<feComposite in="specks" in2="clump" operator="out" result="looseFloorGrain"/>` +
-	`<feComponentTransfer in="looseFloorGrain" result="floorGrain"><feFuncA type="linear" slope="0.3"/></feComponentTransfer>` +
-	`<feGaussianBlur in="clump" stdDeviation="1.2" result="shadowSoft"/>` +
-	`<feOffset in="shadowSoft" dy="2.2" result="shadowDrop"/>` +
-	`<feFlood flood-color="#000000" flood-opacity="0.3"/>` +
-	`<feComposite in2="shadowDrop" operator="in" result="shadow"/>` +
-	`<feOffset in="clump" dy="1.4" result="clumpDown"/>` +
-	`<feComposite in="clump" in2="clumpDown" operator="out" result="topEdge"/>` +
-	`<feFlood flood-color="#ffffff" flood-opacity="0.22"/>` +
-	`<feComposite in2="topEdge" operator="in" result="rim"/>` +
-	`<feMerge><feMergeNode in="floorGrain"/><feMergeNode in="shadow"/><feMergeNode in="clump"/><feMergeNode in="soilGrain"/><feMergeNode in="rim"/></feMerge>` +
-	`</filter>` +
-	`<clipPath id="burrow-field"><rect x="0" y="${FIELD_TOP}" width="${width - GAP_SIZE}" height="${FIELD_HEIGHT - GAP_SIZE}" rx="${BURROW_FIELD_RADIUS}"/></clipPath>`;
+const buildSoilDefs = (width: number) => {
+	const look = SOIL_LOOK;
+	return (
+		`<filter id="burrow-soil" filterUnits="userSpaceOnUse" x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" color-interpolation-filters="sRGB">` +
+		`<feGaussianBlur in="SourceGraphic" stdDeviation="${BURROW_SOIL_CLUMP}" result="soft"/>` +
+		`<feColorMatrix in="soft" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${look.clumpAlphaSlope} ${look.clumpAlphaOffset}" result="clump"/>` +
+		`<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>` +
+		`<feColorMatrix in="noise" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${look.grainSlope} 0 0 0 ${look.grainOffset}" result="specks"/>` +
+		`<feComposite in="specks" in2="clump" operator="in" result="soilGrain"/>` +
+		`<feComposite in="specks" in2="clump" operator="out" result="looseFloorGrain"/>` +
+		`<feComponentTransfer in="looseFloorGrain" result="floorGrain"><feFuncA type="linear" slope="${look.floorGrainStrength}"/></feComponentTransfer>` +
+		`<feGaussianBlur in="clump" stdDeviation="${look.shadowBlur}" result="shadowSoft"/>` +
+		`<feOffset in="shadowSoft" dy="${look.shadowDrop}" result="shadowDrop"/>` +
+		`<feFlood flood-color="#000000" flood-opacity="${look.shadowOpacity}"/>` +
+		`<feComposite in2="shadowDrop" operator="in" result="shadow"/>` +
+		`<feOffset in="clump" dy="${look.rimDepth}" result="clumpDown"/>` +
+		`<feComposite in="clump" in2="clumpDown" operator="out" result="topEdge"/>` +
+		`<feFlood flood-color="#ffffff" flood-opacity="${look.rimOpacity}"/>` +
+		`<feComposite in2="topEdge" operator="in" result="rim"/>` +
+		`<feMerge><feMergeNode in="floorGrain"/><feMergeNode in="shadow"/><feMergeNode in="clump"/><feMergeNode in="soilGrain"/><feMergeNode in="rim"/></feMerge>` +
+		`</filter>` +
+		`<clipPath id="burrow-field"><rect x="0" y="${FIELD_TOP}" width="${width - GAP_SIZE}" height="${FIELD_HEIGHT - GAP_SIZE}" rx="${BURROW_FIELD_RADIUS}"/></clipPath>`
+	);
+};
 
 /** Number of steps a cell shrinks through while it is being dug. */
-export const CRUMBLE_STAGES = 3;
-/** Size of a half-dug cell at each crumble stage (index = stage). */
-const CRUMBLE_SCALES = ['1', '0.8', '0.62', '0.45'];
+export const SHRINK_STAGES = 3;
+/** Size of a half-dug cell at each shrink stage (index = stage). */
+const SHRINK_SCALES = ['1', '0.8', '0.62', '0.45'];
 
 /**
- * Crumble stage (1…CRUMBLE_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
+ * Shrink stage (1…SHRINK_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
  * cell is untouched or fully dug. A level-4 day goes through every stage; a level-1 day opens in one scrape.
  */
-export const crumbleStage = (initial: number, remaining: number) =>
-	remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * CRUMBLE_STAGES - 1e-9);
+export const shrinkStage = (initial: number, remaining: number) =>
+	remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * SHRINK_STAGES - 1e-9);
 
 const toX = (x: number) => x * (CELL_SIZE + GAP_SIZE);
 const toY = (y: number) => y * (CELL_SIZE + GAP_SIZE) + BURROW_HEADER_HEIGHT;
@@ -130,6 +154,12 @@ const generateSteppedLinearAnimation = (positions: string[]): AnimationData | nu
 	return { keyTimes: keyTimes.join(';'), values: values.join(';') };
 };
 
+/** A discrete <animate> for `attributeName`, or nothing when the value never changes. */
+const animateDiscrete = (attributeName: string, anim: AnimationData | null, durationMs: number) =>
+	anim
+		? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
+		: '';
+
 interface SpriteTimeline {
 	positions: string[];
 	refs: string[];
@@ -137,15 +167,11 @@ interface SpriteTimeline {
 }
 
 const renderSprite = ({ positions, refs, opacities }: SpriteTimeline, durationMs: number) => {
-	const animate = (attributeName: string, anim: AnimationData | null) =>
-		anim
-			? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
-			: '';
 	const positionAnim = generateSteppedLinearAnimation(positions);
 
 	let svg = `<use href="${refs[0]}" opacity="${opacities[0]}" transform="translate(${positions[0]})">`;
-	svg += animate('href', generateChangingValuesAnimation(refs));
-	svg += animate('opacity', generateChangingValuesAnimation(opacities));
+	svg += animateDiscrete('href', generateChangingValuesAnimation(refs), durationMs);
+	svg += animateDiscrete('opacity', generateChangingValuesAnimation(opacities), durationMs);
 	if (positionAnim) {
 		svg += `<animateTransform attributeName="transform" type="translate" calcMode="linear" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${positionAnim.keyTimes}" values="${positionAnim.values}"/>`;
 	}
@@ -205,10 +231,6 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 
 	// Tunnel cells are left transparent so the textured tunnel floor shows through underneath.
 	const soilColor = (hardness: number) => (hardness > 0 ? theme.intensityColors[hardness] : 'transparent');
-	const animate = (attributeName: string, anim: AnimationData | null) =>
-		anim
-			? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
-			: '';
 
 	let cells = '';
 	for (let x = 0; x < GRID_WIDTH; x++) {
@@ -218,14 +240,14 @@ const generateAnimatedSVG = (store: BurrowStore): string => {
 			// Cells are drawn edge to edge (no gaps) and shrink a step with each scrape while they are being dug.
 			// Once a cell is dug out it is transparent, so it keeps its last size until the soil regrows; that
 			// saves a keyframe per cell.
-			let scale = CRUMBLE_SCALES[0];
+			let scale = SHRINK_SCALES[0];
 			const scales = snapshots.map((s) => {
-				if (s.soil[x][y] > 0) scale = CRUMBLE_SCALES[crumbleStage(store.initialSoil[x]?.[y] ?? 0, s.soil[x][y])];
+				if (s.soil[x][y] > 0) scale = SHRINK_SCALES[shrinkStage(store.initialSoil[x]?.[y] ?? 0, s.soil[x][y])];
 				return scale;
 			});
 			const scaleAnim = generateChangingValuesAnimation(scales);
 			cells += `<rect x="${-PITCH / 2}" y="${-PITCH / 2}" width="${PITCH}" height="${PITCH}" fill="${fills[0]}" transform="translate(${centerX(x) + GAP_SIZE / 2} ${centerY(y) + GAP_SIZE / 2})">`;
-			cells += animate('fill', generateChangingValuesAnimation(fills));
+			cells += animateDiscrete('fill', generateChangingValuesAnimation(fills), durationMs);
 			if (scaleAnim) {
 				cells += `<animateTransform attributeName="transform" type="scale" additive="sum" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${scaleAnim.keyTimes}" values="${scaleAnim.values}"/>`;
 			}
