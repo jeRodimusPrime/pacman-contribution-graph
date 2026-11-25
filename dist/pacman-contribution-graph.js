@@ -3594,9 +3594,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   BURROW_FIELD_RADIUS: () => (/* binding */ BURROW_FIELD_RADIUS),
 /* harmony export */   BURROW_FREEZE_FRAMES: () => (/* binding */ BURROW_FREEZE_FRAMES),
 /* harmony export */   BURROW_HEADER_HEIGHT: () => (/* binding */ BURROW_HEADER_HEIGHT),
-/* harmony export */   BURROW_LANTERN_COOLDOWN: () => (/* binding */ BURROW_LANTERN_COOLDOWN),
-/* harmony export */   BURROW_LANTERN_HOLD_FRAMES: () => (/* binding */ BURROW_LANTERN_HOLD_FRAMES),
-/* harmony export */   BURROW_LANTERN_RANGE: () => (/* binding */ BURROW_LANTERN_RANGE),
+/* harmony export */   BURROW_HUM_COOLDOWN: () => (/* binding */ BURROW_HUM_COOLDOWN),
+/* harmony export */   BURROW_HUM_FRAMES: () => (/* binding */ BURROW_HUM_FRAMES),
+/* harmony export */   BURROW_HUM_RANGE: () => (/* binding */ BURROW_HUM_RANGE),
 /* harmony export */   BURROW_LEVEL_POINTS: () => (/* binding */ BURROW_LEVEL_POINTS),
 /* harmony export */   BURROW_LULL_HITS: () => (/* binding */ BURROW_LULL_HITS),
 /* harmony export */   BURROW_LULL_POINTS: () => (/* binding */ BURROW_LULL_POINTS),
@@ -3612,7 +3612,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   BURROW_PEBBLE_SPACING: () => (/* binding */ BURROW_PEBBLE_SPACING),
 /* harmony export */   BURROW_PEBBLE_WOBBLE_FRAMES: () => (/* binding */ BURROW_PEBBLE_WOBBLE_FRAMES),
 /* harmony export */   BURROW_REGROW_FRAMES: () => (/* binding */ BURROW_REGROW_FRAMES),
-/* harmony export */   BURROW_SOIL_BLUR: () => (/* binding */ BURROW_SOIL_BLUR),
+/* harmony export */   BURROW_SOIL_CLUMP: () => (/* binding */ BURROW_SOIL_CLUMP),
 /* harmony export */   BURROW_SWEEP_WIDTH: () => (/* binding */ BURROW_SWEEP_WIDTH),
 /* harmony export */   BURROW_WAKE_FRAMES: () => (/* binding */ BURROW_WAKE_FRAMES),
 /* harmony export */   CELL_SIZE: () => (/* reexport safe */ _shared_constants__WEBPACK_IMPORTED_MODULE_0__.CELL_SIZE),
@@ -3625,8 +3625,8 @@ __webpack_require__.r(__webpack_exports__);
 
 
 const BURROW_HEADER_HEIGHT = 24;
-/** Blur radius (stdDeviation, px) that softens the soil into one continuous, blended field. */
-const BURROW_SOIL_BLUR = 6;
+/** Blur (stdDeviation, px) used to round the soil into soft clods; small, so each day keeps its own colour. */
+const BURROW_SOIL_CLUMP = 2;
 /** Corner radius of the soil field as a whole. */
 const BURROW_FIELD_RADIUS = 8;
 const BURROW_MIN_DURATION_MS = 5000;
@@ -3640,17 +3640,17 @@ const BURROW_MAX_IDLE_FRAMES = 150;
 const BURROW_DEN = { x: -1, y: Math.floor(_shared_constants__WEBPACK_IMPORTED_MODULE_0__.GRID_HEIGHT / 2) };
 /** The wombat works on soil within this many columns of the leftmost soil left, sweeping left to right. */
 const BURROW_SWEEP_WIDTH = 2;
-/** Lantern light carries this many cells down a straight, open tunnel. */
-const BURROW_LANTERN_RANGE = 3;
-/** Each flash of the lantern is held up for this many frames, glow pulsing, so the lullaby reads clearly. */
-const BURROW_LANTERN_HOLD_FRAMES = 4;
-/** Frames between lowering the lantern and raising it again. */
-const BURROW_LANTERN_COOLDOWN = 2;
-/** Lantern hits needed to put a beetle to sleep. */
+/** The wombat's humming carries this many cells down a straight, open tunnel. */
+const BURROW_HUM_RANGE = 3;
+/** Each note of the lullaby takes this many frames to float from the wombat to the beetle. */
+const BURROW_HUM_FRAMES = 4;
+/** Frames between one note landing and the next being hummed. */
+const BURROW_HUM_COOLDOWN = 2;
+/** Notes needed to put a beetle to sleep. */
 const BURROW_LULL_HITS = 3;
-/** A lit beetle stays frozen until just after the next flash could land, so it cannot slip away mid-lullaby. */
-const BURROW_FREEZE_FRAMES = BURROW_LANTERN_HOLD_FRAMES + BURROW_LANTERN_COOLDOWN + 2;
-/** Drowsiness wears off by one level after this many frames without light. */
+/** A beetle being sung to stays put until just after the next note could land, so it cannot slip away mid-lullaby. */
+const BURROW_FREEZE_FRAMES = BURROW_HUM_FRAMES + BURROW_HUM_COOLDOWN + 2;
+/** Drowsiness wears off by one level after this many frames without another note. */
 const BURROW_WAKE_FRAMES = 15;
 /** Frames a sleeping or dizzy beetle lingers before heading home. */
 const BURROW_NAP_FRAMES = 12;
@@ -3692,7 +3692,7 @@ const BURROW_BONK_POINTS = 30;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Game: () => (/* binding */ Game),
-/* harmony export */   findLanternTarget: () => (/* binding */ findLanternTarget),
+/* harmony export */   findHumTarget: () => (/* binding */ findHumTarget),
 /* harmony export */   planWombatPath: () => (/* binding */ planWombatPath),
 /* harmony export */   simulate: () => (/* binding */ simulate)
 /* harmony export */ });
@@ -3788,7 +3788,7 @@ const placeBeetles = (store, random) => {
         if (pool.length === 0)
             continue;
         const spot = pool[Math.floor(random() * pool.length)];
-        beetles.push(Object.assign(Object.assign({ id: i }, spot), { state: 'hidden', facing: 'left', drowsiness: 0, frozenFor: 0, lastLitFrame: 0, moveCooldown: 0, stuckFrames: 0, timer: 0, spawn: Object.assign({}, spot) }));
+        beetles.push(Object.assign(Object.assign({ id: i }, spot), { state: 'hidden', facing: 'left', drowsiness: 0, frozenFor: 0, lastHummedFrame: 0, moveCooldown: 0, stuckFrames: 0, timer: 0, spawn: Object.assign({}, spot) }));
     }
     return beetles;
 };
@@ -3805,7 +3805,7 @@ const resetGameState = (store) => {
     store.pebbles = placePebbles(store, random);
     store.initialSoil = cloneSoil(store.soil);
     store.beetles = placeBeetles(store, random);
-    store.wombat = Object.assign(Object.assign({}, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, lanternCooldown: 0, lanternHold: 0, lanternAim: 'side', visible: true });
+    store.wombat = Object.assign(Object.assign({}, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, humCooldown: 0, humHold: 0, humTarget: null, visible: true });
     pushSnapshot(store);
     return random;
 };
@@ -3826,10 +3826,10 @@ const addScore = (store, points) => {
 };
 /* ───────────────────────── Wombat ───────────────────────── */
 /**
- * The first awake beetle the lantern can reach: in a straight line, at most BURROW_LANTERN_RANGE cells away,
- * with only open tunnel in between. Light does not pass through soil, except right up close.
+ * The first awake beetle the wombat's humming can reach: in a straight line, at most BURROW_HUM_RANGE cells away,
+ * with only open tunnel in between. The tune does not carry through soil, except right up close.
  */
-const findLanternTarget = (store) => {
+const findHumTarget = (store) => {
     const { wombat } = store;
     for (const { x: dx, y: dy } of [
         { x: wombat.facing === 'right' ? 1 : -1, y: 0 },
@@ -3837,7 +3837,7 @@ const findLanternTarget = (store) => {
         { x: 0, y: -1 },
         { x: 0, y: 1 }
     ]) {
-        for (let distance = 1; distance <= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LANTERN_RANGE; distance++) {
+        for (let distance = 1; distance <= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_HUM_RANGE; distance++) {
             const p = { x: wombat.x + dx * distance, y: wombat.y + dy * distance };
             if (!(0,_ai__WEBPACK_IMPORTED_MODULE_2__.inBounds)(p) || pebbleAt(store, p))
                 break;
@@ -3853,18 +3853,26 @@ const findLanternTarget = (store) => {
     }
     return null;
 };
-const raiseLantern = (store, beetle, frame) => {
+/** The wombat closes its eyes and hums; a note sets off towards the beetle, which stops to listen. */
+const startHumming = (store, beetle) => {
     const { wombat } = store;
-    wombat.pose = 'lantern';
+    wombat.pose = 'hum';
     wombat.facing = facingTowards(wombat, beetle, wombat.facing);
-    wombat.lanternAim = beetle.y < wombat.y ? 'up' : beetle.y > wombat.y ? 'down' : 'side';
     wombat.digPhase = 0;
-    // The flash frame counts as the first held frame; the cooldown starts once the lantern comes down.
-    wombat.lanternHold = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LANTERN_HOLD_FRAMES - 1;
-    wombat.lanternCooldown = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LANTERN_COOLDOWN + 1;
+    wombat.humTarget = beetle.id;
+    wombat.humHold = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_HUM_FRAMES - 1;
+    // The cooldown only starts counting once the note has landed.
+    wombat.humCooldown = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_HUM_COOLDOWN + 1;
+    beetle.frozenFor = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_FREEZE_FRAMES;
+};
+/** The note reaches the beetle, which gets a little sleepier. */
+const landNote = (store, frame) => {
+    const beetle = store.beetles.find((b) => b.id === store.wombat.humTarget);
+    if (!beetle || beetle.state !== 'awake')
+        return;
     beetle.drowsiness++;
     beetle.frozenFor = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_FREEZE_FRAMES;
-    beetle.lastLitFrame = frame;
+    beetle.lastHummedFrame = frame;
     if (beetle.drowsiness >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_LULL_HITS) {
         beetle.state = 'asleep';
         beetle.timer = _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_NAP_FRAMES;
@@ -3908,23 +3916,26 @@ const planWombatPath = (store) => {
         return wombatStepCost(store, p);
     }, (p) => { var _a; return ((_a = beetleAt(store, p)) === null || _a === void 0 ? void 0 : _a.state) === 'awake'; });
 };
-/** Returns true when the wombat dug or lulled something this frame. */
+/** Returns true when the wombat dug or sang this frame. */
 const moveWombat = (store, frame) => {
     var _a, _b;
     const { wombat } = store;
-    if (wombat.lanternHold > 0) {
-        wombat.lanternHold--;
+    if (wombat.humHold > 0) {
+        wombat.humHold--;
         wombat.digPhase = 1 - wombat.digPhase;
+        if (wombat.humHold === 0)
+            landNote(store, frame);
         return true;
     }
-    wombat.lanternCooldown = Math.max(0, wombat.lanternCooldown - 1);
+    wombat.humCooldown = Math.max(0, wombat.humCooldown - 1);
     wombat.pose = 'walk';
-    const beetle = findLanternTarget(store);
-    if (beetle && wombat.lanternCooldown === 0) {
-        raiseLantern(store, beetle, frame);
+    wombat.humTarget = null;
+    const beetle = findHumTarget(store);
+    if (beetle && wombat.humCooldown === 0) {
+        startHumming(store, beetle);
         return true;
     }
-    // Mid-lullaby: wait for the lantern to be ready again rather than wandering out of reach.
+    // Mid-lullaby: wait for the next note rather than wandering out of earshot.
     if (beetle && beetle.drowsiness > 0) {
         wombat.facing = facingTowards(wombat, beetle, wombat.facing);
         return true;
@@ -4037,9 +4048,9 @@ const updateBeetles = (store, frame, random) => {
         }
         if (beetle.state !== 'awake')
             continue;
-        if (beetle.drowsiness > 0 && frame - beetle.lastLitFrame >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_WAKE_FRAMES) {
+        if (beetle.drowsiness > 0 && frame - beetle.lastHummedFrame >= _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_WAKE_FRAMES) {
             beetle.drowsiness--;
-            beetle.lastLitFrame = frame;
+            beetle.lastHummedFrame = frame;
         }
         if (beetle.frozenFor > 0) {
             beetle.frozenFor--;
@@ -4074,7 +4085,7 @@ const playEnding = (store) => {
     for (const pebble of store.pebbles)
         pebble.state = 'gone';
     pushSnapshot(store);
-    Object.assign(store.wombat, Object.assign(Object.assign({}, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, lanternCooldown: 0, lanternHold: 0, lanternAim: 'side' }));
+    Object.assign(store.wombat, Object.assign(Object.assign({}, _constants__WEBPACK_IMPORTED_MODULE_3__.BURROW_DEN), { facing: 'right', pose: 'walk', digPhase: 0, humCooldown: 0, humHold: 0, humTarget: null }));
     for (const beetle of store.beetles)
         Object.assign(beetle, Object.assign(Object.assign({}, beetle.spawn), { state: 'hidden', facing: 'left', drowsiness: 0 }));
     for (const pebble of store.pebbles)
@@ -4182,9 +4193,9 @@ const Store = {
         facing: 'right',
         pose: 'walk',
         digPhase: 0,
-        lanternCooldown: 0,
-        lanternHold: 0,
-        lanternAim: 'side',
+        humCooldown: 0,
+        humHold: 0,
+        humTarget: null,
         visible: true
     },
     beetles: [],
@@ -4266,13 +4277,10 @@ class BurrowRenderer {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   CRUMBLE_STAGES: () => (/* binding */ CRUMBLE_STAGES),
 /* harmony export */   beetleRef: () => (/* binding */ beetleRef),
 /* harmony export */   buildSpriteDefs: () => (/* binding */ buildSpriteDefs),
-/* harmony export */   crumbleRef: () => (/* binding */ crumbleRef),
-/* harmony export */   crumbleStage: () => (/* binding */ crumbleStage),
 /* harmony export */   getBurrowPalette: () => (/* binding */ getBurrowPalette),
-/* harmony export */   lanternGlowRef: () => (/* binding */ lanternGlowRef),
+/* harmony export */   noteRef: () => (/* binding */ noteRef),
 /* harmony export */   pebbleRef: () => (/* binding */ pebbleRef),
 /* harmony export */   wombatRef: () => (/* binding */ wombatRef)
 /* harmony export */ });
@@ -4281,37 +4289,39 @@ const getBurrowPalette = (theme) => {
     return isDark
         ? {
             tunnel: '#2b2019',
-            outline: '#14100c',
-            fur: '#b58d68',
-            furShade: '#8f6b4c',
+            outline: '#1d1510',
+            fur: '#a9855f',
+            furShade: '#86664a',
             nose: '#3a2a20',
-            cheek: '#e79a92',
-            lamp: '#ffcf5c',
-            glow: '#ffd98a',
-            shell: '#b48ad6',
-            shellSpot: '#d9c2ee',
-            beetleHead: '#4a3560',
-            pebble: '#a39d94',
-            pebbleShade: '#7d776f',
-            sparkle: '#ffe08a',
-            snooze: '#f3e3c8'
+            cheek: '#c98b80',
+            lamp: '#e8bd5a',
+            shell: '#8f7398',
+            shellSpot: '#b8a3bd',
+            beetleHead: '#4a3a4f',
+            pebble: '#8e857a',
+            pebbleShade: '#6e665c',
+            note: '#f0cf86',
+            sparkle: '#e8c46a',
+            snooze: '#e6d3b3',
+            shadow: '#000000'
         }
         : {
             tunnel: '#efe3cf',
-            outline: '#3b2a1e',
+            outline: '#5a4434',
             fur: '#a07a58',
-            furShade: '#7f5d40',
-            nose: '#3b2a1e',
-            cheek: '#ef9f97',
-            lamp: '#ffc23d',
-            glow: '#ffd56b',
-            shell: '#7b4b94',
-            shellSpot: '#b893cb',
-            beetleHead: '#3d2a4d',
-            pebble: '#8f8a83',
-            pebbleShade: '#68635d',
-            sparkle: '#e0a21a',
-            snooze: '#6b4f3a'
+            furShade: '#836246',
+            nose: '#4a3628',
+            cheek: '#e3a097',
+            lamp: '#e8b13a',
+            shell: '#7d5f86',
+            shellSpot: '#a98fae',
+            beetleHead: '#4a3a4f',
+            pebble: '#9a8f80',
+            pebbleShade: '#76695b',
+            note: '#8a5a2b',
+            sparkle: '#c98d1e',
+            snooze: '#7a5c44',
+            shadow: '#3b2a1e'
         };
 };
 /* ───────────────────────── Sprite ids ───────────────────────── */
@@ -4321,17 +4331,14 @@ const wombatRef = (wombat) => {
             return '#bw-sleep';
         case 'dig':
             return `#bw-dig${wombat.digPhase}-${wombat.facing[0]}`;
-        case 'lantern':
-            return `#bw-lantern-${wombat.facing[0]}`;
+        case 'hum':
+            return `#bw-hum-${wombat.facing[0]}`;
         default:
             return `#bw-walk-${wombat.facing[0]}`;
     }
 };
-/**
- * The lantern's light, drawn on its own layer behind the beetles so a lit beetle sits in the light instead of
- * being washed out by it. Pulses brighter every other frame. `null` when the lantern is down.
- */
-const lanternGlowRef = (wombat) => wombat.pose === 'lantern' ? `#bg-${wombat.lanternAim}${wombat.digPhase ? '-bright' : ''}-${wombat.facing[0]}` : null;
+/** The two notes of the lullaby alternate as it floats along. */
+const noteRef = (phase) => `#bn-${phase % 2}`;
 const beetleRef = (beetle) => {
     switch (beetle.state) {
         case 'asleep':
@@ -4355,27 +4362,26 @@ const pebbleRef = (pebble) => {
     }
 };
 /* ───────────────────────── Drawings ───────────────────────── */
-const wombatBody = (c) => `<ellipse cx="-5" cy="7.6" rx="2.2" ry="1.4" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.8"/>` +
-    `<ellipse cx="2" cy="7.6" rx="2.2" ry="1.4" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.8"/>` +
-    `<ellipse cx="-1.5" cy="2" rx="8" ry="6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1.1"/>` +
-    `<path d="M-7 4 Q-2 7 3 4" fill="none" stroke="${c.furShade}" stroke-width="1" stroke-linecap="round"/>` +
-    `<ellipse cx="1.8" cy="-4.6" rx="1.5" ry="2" fill="${c.fur}" stroke="${c.outline}" stroke-width="0.8"/>` +
-    `<circle cx="5" cy="-0.4" r="4.6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1.1"/>` +
-    `<circle cx="4.2" cy="-4.4" r="1.4" fill="${c.lamp}" stroke="${c.outline}" stroke-width="0.6"/>` +
+const groundShadow = (c, rx, cy = 8.6) => `<ellipse cx="0" cy="${cy}" rx="${rx}" ry="1.6" fill="${c.shadow}" opacity="0.18"/>`;
+const zz = (c, x, y, size) => `<text x="${x}" y="${y}" font-size="${size}" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>`;
+/** The wombat's face changes with the pose: open eyes, or closed eyes and a little "o" while humming. */
+const wombatBody = (c, face = 'awake') => groundShadow(c, 9) +
+    `<ellipse cx="-5" cy="7.6" rx="2.2" ry="1.4" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.6"/>` +
+    `<ellipse cx="2" cy="7.6" rx="2.2" ry="1.4" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.6"/>` +
+    `<ellipse cx="-1.5" cy="2" rx="8" ry="6" fill="${c.fur}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<path d="M-7 4 Q-2 7 3 4" fill="none" stroke="${c.furShade}" stroke-width="0.9" stroke-linecap="round"/>` +
+    `<ellipse cx="1.8" cy="-4.6" rx="1.5" ry="2" fill="${c.fur}" stroke="${c.outline}" stroke-width="0.6"/>` +
+    `<circle cx="5" cy="-0.4" r="4.6" fill="${c.fur}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<circle cx="4.2" cy="-4.4" r="1.3" fill="${c.lamp}" stroke="${c.outline}" stroke-width="0.5"/>` +
     `<ellipse cx="8.8" cy="0.2" rx="2" ry="1.6" fill="${c.nose}"/>` +
-    `<circle cx="6.1" cy="-1.4" r="0.9" fill="${c.outline}"/>` +
-    `<circle cx="6.4" cy="-1.7" r="0.3" fill="#ffffff"/>` +
-    `<circle cx="5" cy="1.8" r="1.1" fill="${c.cheek}" opacity="0.75"/>`;
-const wombatPaw = (c, x, y) => `<ellipse cx="${x}" cy="${y}" rx="2" ry="1.5" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.8"/>` +
-    `<path d="M${x + 1.6} ${y - 0.8} l1.4 -0.4 M${x + 1.9} ${y + 0.2} l1.5 0 M${x + 1.6} ${y + 1} l1.4 0.5" stroke="${c.outline}" stroke-width="0.6" stroke-linecap="round"/>`;
+    (face === 'awake'
+        ? `<circle cx="6.1" cy="-1.4" r="0.9" fill="${c.outline}"/><circle cx="6.4" cy="-1.7" r="0.3" fill="#ffffff"/>`
+        : `<path d="M5.3 -1.4 q0.8 0.8 1.6 0" fill="none" stroke="${c.outline}" stroke-width="0.6" stroke-linecap="round"/>` +
+            `<ellipse cx="7.6" cy="2.4" rx="0.7" ry="0.8" fill="${c.nose}"/>`) +
+    `<circle cx="5" cy="1.8" r="1.1" fill="${c.cheek}" opacity="0.7"/>`;
+const wombatPaw = (c, x, y) => `<ellipse cx="${x}" cy="${y}" rx="2" ry="1.5" fill="${c.furShade}" stroke="${c.outline}" stroke-width="0.6"/>` +
+    `<path d="M${x + 1.6} ${y - 0.8} l1.4 -0.4 M${x + 1.9} ${y + 0.2} l1.5 0 M${x + 1.6} ${y + 1} l1.4 0.5" stroke="${c.outline}" stroke-width="0.5" stroke-linecap="round"/>`;
 const crumbs = (c, points) => points.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="0.9" fill="${c.furShade}" opacity="0.8"/>`).join('');
-/** A soft cone of light from the lantern towards the beetle, plus a halo round the lantern itself. */
-const lanternGlow = (c, cx, cy, rx, ry, bright = false) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${c.glow}" opacity="${bright ? 0.4 : 0.28}"/>` +
-    `<circle cx="11" cy="1" r="${bright ? 8 : 6}" fill="${c.glow}" opacity="${bright ? 0.5 : 0.4}"/>`;
-const wombatWithLantern = (c) => wombatBody(c) +
-    `<path d="M9 -2.5 v-1.5 h3 v1.5" fill="none" stroke="${c.outline}" stroke-width="0.7"/>` +
-    `<rect x="8.6" y="-2.5" width="3.8" height="5" rx="1" fill="${c.lamp}" stroke="${c.outline}" stroke-width="0.8"/>` +
-    wombatPaw(c, 8, 4);
 const wombatSprites = (c) => ({
     'bw-walk-r': wombatBody(c),
     'bw-dig0-r': wombatBody(c) +
@@ -4390,98 +4396,71 @@ const wombatSprites = (c) => ({
             [12, 0.5],
             [11, 7]
         ]),
-    'bw-lantern-r': wombatWithLantern(c),
-    'bg-side-r': lanternGlow(c, 22, 1, 14, 6),
-    'bg-up-r': lanternGlow(c, 10.5, -14, 6, 14),
-    'bg-down-r': lanternGlow(c, 10.5, 16, 6, 14),
-    'bg-side-bright-r': lanternGlow(c, 22, 1, 15, 7, true),
-    'bg-up-bright-r': lanternGlow(c, 10.5, -14, 7, 15, true),
-    'bg-down-bright-r': lanternGlow(c, 10.5, 16, 7, 15, true),
-    'bw-sleep': `<ellipse cx="0" cy="3" rx="8.5" ry="6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1.1"/>` +
-        `<path d="M-6 5 Q0 8.5 6 5" fill="none" stroke="${c.furShade}" stroke-width="1" stroke-linecap="round"/>` +
-        `<circle cx="4.5" cy="2.5" r="3.6" fill="${c.fur}" stroke="${c.outline}" stroke-width="1"/>` +
+    'bw-hum-r': wombatBody(c, 'humming'),
+    'bw-sleep': groundShadow(c, 9.5, 9) +
+        `<ellipse cx="0" cy="3" rx="8.5" ry="6" fill="${c.fur}" stroke="${c.outline}" stroke-width="0.8"/>` +
+        `<path d="M-6 5 Q0 8.5 6 5" fill="none" stroke="${c.furShade}" stroke-width="0.9" stroke-linecap="round"/>` +
+        `<circle cx="4.5" cy="2.5" r="3.6" fill="${c.fur}" stroke="${c.outline}" stroke-width="0.8"/>` +
         `<ellipse cx="7.4" cy="3.4" rx="1.5" ry="1.2" fill="${c.nose}"/>` +
-        `<path d="M3.4 1.8 q1 0.9 2 0" fill="none" stroke="${c.outline}" stroke-width="0.7" stroke-linecap="round"/>` +
-        `<circle cx="3.8" cy="4.2" r="0.9" fill="${c.cheek}" opacity="0.75"/>` +
-        `<text x="5" y="-5" font-size="6" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>` +
-        `<text x="9" y="-9" font-size="4.5" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>`
+        `<path d="M3.4 1.8 q1 0.9 2 0" fill="none" stroke="${c.outline}" stroke-width="0.6" stroke-linecap="round"/>` +
+        `<circle cx="3.8" cy="4.2" r="0.9" fill="${c.cheek}" opacity="0.7"/>` +
+        zz(c, 5, -5, 6) +
+        zz(c, 9, -9, 4.5)
 });
-const beetleLegs = (c) => `<path d="M-4 3.5 l-1.5 2.5 M0 4.2 l0 2.6 M4 3.5 l1.5 2.5" stroke="${c.outline}" stroke-width="0.8" stroke-linecap="round"/>`;
-const beetleBody = (c, eyes) => beetleLegs(c) +
-    `<path d="M6.5 -1.5 q2 -3.5 0.5 -5.5 M7.5 -0.5 q3.5 -2.5 3 -5" fill="none" stroke="${c.outline}" stroke-width="0.7" stroke-linecap="round"/>` +
-    `<circle cx="6.2" cy="1" r="2.8" fill="${c.beetleHead}" stroke="${c.outline}" stroke-width="0.8"/>` +
-    `<ellipse cx="-0.5" cy="1" rx="6.2" ry="4.6" fill="${c.shell}" stroke="${c.outline}" stroke-width="1"/>` +
-    `<path d="M-0.5 -3.6 V5.6" stroke="${c.outline}" stroke-width="0.7"/>` +
+/** Music notes drift from the wombat to the beetle: a single quaver and a pair of beamed ones. */
+const noteSprites = (c) => {
+    const stroke = `stroke="${c.outline}" stroke-width="0.5"`;
+    return {
+        'bn-0': `<ellipse cx="-1" cy="3" rx="2.2" ry="1.6" transform="rotate(-20 -1 3)" fill="${c.note}" ${stroke}/>` +
+            `<path d="M1 2.6 V-5 q3 1.5 3.4 4.2" fill="none" stroke="${c.note}" stroke-width="1.1" stroke-linecap="round"/>`,
+        'bn-1': `<ellipse cx="-3" cy="3.6" rx="2" ry="1.5" transform="rotate(-20 -3 3.6)" fill="${c.note}" ${stroke}/>` +
+            `<ellipse cx="3" cy="2.4" rx="2" ry="1.5" transform="rotate(-20 3 2.4)" fill="${c.note}" ${stroke}/>` +
+            `<path d="M-1.2 3.2 V-4 L4.8 -5.2 V2" fill="none" stroke="${c.note}" stroke-width="1.1" stroke-linejoin="round"/>`
+    };
+};
+const beetleLegs = (c) => `<path d="M-4 3.5 l-1.5 2.5 M0 4.2 l0 2.6 M4 3.5 l1.5 2.5" stroke="${c.outline}" stroke-width="0.6" stroke-linecap="round"/>`;
+const beetleBody = (c, eyes) => groundShadow(c, 7) +
+    beetleLegs(c) +
+    `<path d="M6.5 -1.5 q2 -3.5 0.5 -5.5 M7.5 -0.5 q3.5 -2.5 3 -5" fill="none" stroke="${c.outline}" stroke-width="0.6" stroke-linecap="round"/>` +
+    `<circle cx="6.2" cy="1" r="2.8" fill="${c.beetleHead}" stroke="${c.outline}" stroke-width="0.6"/>` +
+    `<ellipse cx="-0.5" cy="1" rx="6.2" ry="4.6" fill="${c.shell}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<path d="M-0.5 -3.6 V5.6" stroke="${c.outline}" stroke-width="0.6"/>` +
     `<circle cx="-3" cy="-0.2" r="1" fill="${c.shellSpot}"/><circle cx="2" cy="2.4" r="0.9" fill="${c.shellSpot}"/>` +
     eyes;
 const grumpyEyes = (c) => `<circle cx="7.2" cy="0.6" r="1.1" fill="#ffffff"/><circle cx="7.6" cy="0.8" r="0.5" fill="${c.outline}"/>` +
-    `<path d="M5.8 -1 l2.6 0.8" stroke="${c.outline}" stroke-width="0.7" stroke-linecap="round"/>`;
-const sleepyEyes = (c, closed) => closed
-    ? `<path d="M6.4 1 q0.9 0.8 1.8 0" fill="none" stroke="#ffffff" stroke-width="0.7" stroke-linecap="round"/>`
-    : `<circle cx="7.2" cy="0.8" r="1.1" fill="#ffffff"/><path d="M6 0.4 h2.4" stroke="${c.beetleHead}" stroke-width="1.2"/>` +
-        `<circle cx="7.5" cy="1.1" r="0.45" fill="${c.outline}"/>`;
+    `<path d="M5.8 -1 l2.6 0.8" stroke="${c.outline}" stroke-width="0.6" stroke-linecap="round"/>`;
+/** Heavy lids: the beetle is getting sleepy. */
+const droopyEyes = (c) => `<circle cx="7.2" cy="0.8" r="1.1" fill="#ffffff"/><path d="M5.9 0.5 h2.6" stroke="${c.beetleHead}" stroke-width="1.3"/>` +
+    `<circle cx="7.5" cy="1.2" r="0.45" fill="${c.outline}"/>`;
+const closedEyes = () => `<path d="M6.4 1 q0.9 0.8 1.8 0" fill="none" stroke="#ffffff" stroke-width="0.6" stroke-linecap="round"/>`;
 const sparkle = (c, x, y, r) => `<path d="M${x} ${y - r} L${x + r * 0.3} ${y - r * 0.3} L${x + r} ${y} L${x + r * 0.3} ${y + r * 0.3} L${x} ${y + r} L${x - r * 0.3} ${y + r * 0.3} L${x - r} ${y} L${x - r * 0.3} ${y - r * 0.3}Z" fill="${c.sparkle}"/>`;
 const beetleSprites = (c) => ({
     'bb-walk-r': beetleBody(c, grumpyEyes(c)),
-    'bb-drowsy1-r': beetleBody(c, sleepyEyes(c, false)) + sparkle(c, 0, -7, 2.2),
-    'bb-drowsy2-r': beetleBody(c, sleepyEyes(c, true)) + sparkle(c, -3, -7, 2.4) + sparkle(c, 3, -8, 1.6),
-    'bb-asleep': `<ellipse cx="0" cy="3" rx="6.4" ry="4.2" fill="${c.shell}" stroke="${c.outline}" stroke-width="1"/>` +
-        `<path d="M0 -1 V7" stroke="${c.outline}" stroke-width="0.7"/>` +
+    'bb-drowsy1-r': beetleBody(c, droopyEyes(c)),
+    // Nodding off: head dips forward, eyes shut, a first little "z".
+    'bb-drowsy2-r': `<g transform="rotate(10 0 4)">${beetleBody(c, closedEyes())}</g>` + zz(c, 5, -5, 5),
+    'bb-asleep': groundShadow(c, 7) +
+        `<ellipse cx="0" cy="3" rx="6.4" ry="4.2" fill="${c.shell}" stroke="${c.outline}" stroke-width="0.8"/>` +
+        `<path d="M0 -1 V7" stroke="${c.outline}" stroke-width="0.6"/>` +
         `<circle cx="-2.6" cy="2" r="0.9" fill="${c.shellSpot}"/><circle cx="2.4" cy="4" r="0.8" fill="${c.shellSpot}"/>` +
-        `<text x="3" y="-3" font-size="5.5" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>` +
-        `<text x="7" y="-6.5" font-size="4" font-family="sans-serif" font-weight="bold" fill="${c.snooze}">z</text>`,
-    'bb-dizzy': beetleBody(c, `<path d="M6.4 0 l1.6 1.6 M8 0 l-1.6 1.6" stroke="#ffffff" stroke-width="0.7" stroke-linecap="round"/>`) +
+        zz(c, 3, -3, 5.5) +
+        zz(c, 7, -6.5, 4),
+    'bb-dizzy': beetleBody(c, `<path d="M6.4 0 l1.6 1.6 M8 0 l-1.6 1.6" stroke="#ffffff" stroke-width="0.6" stroke-linecap="round"/>`) +
         sparkle(c, -4, -7, 1.6) +
         sparkle(c, 0, -8.5, 1.6) +
         sparkle(c, 4, -7, 1.6)
 });
-const pebbleShape = (c) => `<path d="M-7 4 Q-8 -2 -3 -5 Q2 -7 6 -3 Q9 1 6 5 Q0 8 -7 4Z" fill="${c.pebble}" stroke="${c.outline}" stroke-width="1"/>` +
-    `<path d="M-4 -2 Q-1 -4 2 -3.5" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.45"/>` +
+const pebbleShape = (c) => groundShadow(c, 7, 7.6) +
+    `<path d="M-7 4 Q-8 -2 -3 -5 Q2 -7 6 -3 Q9 1 6 5 Q0 8 -7 4Z" fill="${c.pebble}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    `<path d="M-4 -2 Q-1 -4 2 -3.5" fill="none" stroke="#ffffff" stroke-width="0.9" stroke-linecap="round" opacity="0.3"/>` +
     `<circle cx="2.5" cy="2.5" r="1" fill="${c.pebbleShade}"/>`;
 const pebbleSprites = (c) => ({
     'bp-rest': pebbleShape(c),
     'bp-tilt-a': `<g transform="rotate(-12)"><use href="#bp-rest"/></g>`,
     'bp-tilt-b': `<g transform="rotate(12)"><use href="#bp-rest"/></g>`,
-    'bp-crumble': `<path d="M-7 5 l3 -4 l3 4z M-1 6 l3 -5 l3 5z M4 5 l2 -3 l2 3z" fill="${c.pebble}" stroke="${c.outline}" stroke-width="0.8"/>` +
+    'bp-crumble': `<path d="M-7 5 l3 -4 l3 4z M-1 6 l3 -5 l3 5z M4 5 l2 -3 l2 3z" fill="${c.pebble}" stroke="${c.outline}" stroke-width="0.6"/>` +
         `<circle cx="-4" cy="-3" r="0.8" fill="${c.pebbleShade}"/><circle cx="3" cy="-4" r="0.7" fill="${c.pebbleShade}"/>`
 });
-/* ───────────────────────── Crumbling soil ───────────────────────── */
-/** Number of crumble stages drawn over a cell while it is being dug. */
-const CRUMBLE_STAGES = 3;
-/**
- * Crumble stage (1…CRUMBLE_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
- * cell is untouched or fully dug. A level-4 day goes through every stage; a level-1 day opens in one scrape.
- */
-const crumbleStage = (initial, remaining) => remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * CRUMBLE_STAGES - 1e-9);
-const crumbleRef = (stage) => `#bc-${stage}`;
-/** Holes are clipped to a round clod so they sit softly on the blended soil instead of showing square edges. */
-const CRUMBLE_CLIP = `<clipPath id="bc-clip"><circle r="10.5"/></clipPath>`;
-/**
- * Holes are painted in the tunnel colour, so whatever is left of the cell keeps its current soil shade
- * underneath. Each stage keeps the holes of the one before, so the soil only ever falls away.
- */
-const crumbleSprites = (c) => {
-    const hole = (d) => `<path d="${d}" fill="${c.tunnel}"/>`;
-    const crack = (d) => `<path d="${d}" fill="none" stroke="${c.outline}" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>`;
-    const crumb = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c.tunnel}"/>`;
-    const stage1 = hole('M4 -10 L10 -10 L10 -4 L7 -5 L5 -7Z') +
-        crack('M-6 -10 L-3 -4 L-6 1 M4 10 L2 5 L5 1 M5 -7 L1 -5') +
-        crumb(-1, -7, 0.9) +
-        crumb(7, 2, 0.7);
-    const stage2 = stage1 +
-        hole('M-10 3 L-5 2 L-3 6 L-4 10 L-10 10Z') +
-        hole('M-3 -4 L2 -5 L3 -1 L-1 1Z') +
-        crack('M-3 6 L1 3 L3 -1 M-10 -3 L-6 1') +
-        crumb(5, 6, 1) +
-        crumb(-7, -4, 0.8);
-    const stage3 = hole('M-10 -5 L-5 -10 L5 -10 L10 -2 L10 5 L5 10 L-5 10 L-10 4Z') +
-        crack('M-10 -5 L-5 -10 M10 5 L5 10') +
-        `<circle cx="-2" cy="1" r="1.4" fill="${c.outline}" opacity="0.25"/>` +
-        `<circle cx="3" cy="4" r="1" fill="${c.outline}" opacity="0.25"/>` +
-        `<circle cx="1" cy="-4" r="0.8" fill="${c.outline}" opacity="0.25"/>`;
-    const clipped = (body) => `<g clip-path="url(#bc-clip)">${body}</g>`;
-    return { 'bc-1': clipped(stage1), 'bc-2': clipped(stage2), 'bc-3': clipped(stage3) };
-};
 /** Facing left is the right-facing drawing mirrored. */
 const mirrored = (sprites) => {
     const result = Object.assign({}, sprites);
@@ -4493,7 +4472,7 @@ const mirrored = (sprites) => {
 };
 /** The <defs> block for every sprite referenced in `usedRefs` (plus whatever those depend on). */
 const buildSpriteDefs = (palette, usedRefs) => {
-    const all = mirrored(Object.assign(Object.assign(Object.assign(Object.assign({}, wombatSprites(palette)), beetleSprites(palette)), pebbleSprites(palette)), crumbleSprites(palette)));
+    const all = mirrored(Object.assign(Object.assign(Object.assign(Object.assign({}, wombatSprites(palette)), noteSprites(palette)), beetleSprites(palette)), pebbleSprites(palette)));
     const needed = new Set();
     const include = (id) => {
         if (needed.has(id) || !all[id])
@@ -4506,8 +4485,7 @@ const buildSpriteDefs = (palette, usedRefs) => {
     };
     for (const ref of usedRefs)
         include(ref.replace(/^#/, ''));
-    const clip = [...needed].some((id) => id.startsWith('bc-')) ? CRUMBLE_CLIP : '';
-    return `<defs>${clip}${[...needed].map((id) => `<g id="${id}">${all[id]}</g>`).join('')}</defs>`;
+    return `<defs>${[...needed].map((id) => `<g id="${id}">${all[id]}</g>`).join('')}</defs>`;
 };
 
 
@@ -4521,8 +4499,10 @@ const buildSpriteDefs = (palette, usedRefs) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   CRUMBLE_STAGES: () => (/* binding */ CRUMBLE_STAGES),
 /* harmony export */   Renderer: () => (/* binding */ Renderer),
-/* harmony export */   SVG_KEY_TIMES_PRECISION: () => (/* binding */ SVG_KEY_TIMES_PRECISION)
+/* harmony export */   SVG_KEY_TIMES_PRECISION: () => (/* binding */ SVG_KEY_TIMES_PRECISION),
+/* harmony export */   crumbleStage: () => (/* binding */ crumbleStage)
 /* harmony export */ });
 /* harmony import */ var _shared_utils_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../shared/utils/utils */ "./src/shared/utils/utils.ts");
 /* harmony import */ var _core_constants__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/constants */ "./src/burrow/core/constants.ts");
@@ -4534,47 +4514,72 @@ const PITCH = _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_con
 const FIELD_TOP = _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_HEADER_HEIGHT;
 const FIELD_HEIGHT = _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT * PITCH;
 /**
- * The soil is drawn as one continuous field: neighbouring days blur into each other like layers of earth.
- * The blur would fade the field's outer edge into the background, so alpha is forced back to fully opaque
- * (feComponentTransfer works on un-premultiplied colour, so edge colours come out true, not darkened).
+ * The soil is one continuous layer of earth with open tunnels carved through it:
+ * - a small blur followed by an alpha threshold rounds the soil into soft clods, so neighbouring days run
+ *   together and dug-out tunnels get rounded walls, while each day keeps its own colour;
+ * - fine grain gives both the soil and the tunnel floor some texture;
+ * - the soil casts a short shadow down into the tunnels and catches a little light on its top edges,
+ *   so the tunnels read as carved out of it rather than painted on.
  */
 const buildSoilDefs = (width) => `<filter id="burrow-soil" filterUnits="userSpaceOnUse" x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" color-interpolation-filters="sRGB">` +
-    `<feGaussianBlur stdDeviation="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_SOIL_BLUR}" edgeMode="duplicate"/>` +
-    `<feComponentTransfer><feFuncA type="table" tableValues="1 1"/></feComponentTransfer>` +
+    `<feGaussianBlur in="SourceGraphic" stdDeviation="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_SOIL_CLUMP}" result="soft"/>` +
+    `<feColorMatrix in="soft" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 18 -8" result="clump"/>` +
+    `<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>` +
+    `<feColorMatrix in="noise" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 0 0 0 -0.74" result="specks"/>` +
+    `<feComposite in="specks" in2="clump" operator="in" result="soilGrain"/>` +
+    `<feComposite in="specks" in2="clump" operator="out" result="looseFloorGrain"/>` +
+    `<feComponentTransfer in="looseFloorGrain" result="floorGrain"><feFuncA type="linear" slope="0.3"/></feComponentTransfer>` +
+    `<feGaussianBlur in="clump" stdDeviation="1.2" result="shadowSoft"/>` +
+    `<feOffset in="shadowSoft" dy="2.2" result="shadowDrop"/>` +
+    `<feFlood flood-color="#000000" flood-opacity="0.3"/>` +
+    `<feComposite in2="shadowDrop" operator="in" result="shadow"/>` +
+    `<feOffset in="clump" dy="1.4" result="clumpDown"/>` +
+    `<feComposite in="clump" in2="clumpDown" operator="out" result="topEdge"/>` +
+    `<feFlood flood-color="#ffffff" flood-opacity="0.22"/>` +
+    `<feComposite in2="topEdge" operator="in" result="rim"/>` +
+    `<feMerge><feMergeNode in="floorGrain"/><feMergeNode in="shadow"/><feMergeNode in="clump"/><feMergeNode in="soilGrain"/><feMergeNode in="rim"/></feMerge>` +
     `</filter>` +
     `<clipPath id="burrow-field"><rect x="0" y="${FIELD_TOP}" width="${width - _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE}" height="${FIELD_HEIGHT - _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE}" rx="${_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_FIELD_RADIUS}"/></clipPath>`;
+/** Number of steps a cell shrinks through while it is being dug. */
+const CRUMBLE_STAGES = 3;
+/** Size of a half-dug cell at each crumble stage (index = stage). */
+const CRUMBLE_SCALES = ['1', '0.8', '0.62', '0.45'];
+/**
+ * Crumble stage (1…CRUMBLE_STAGES) for a cell with `remaining` of its `initial` hardness left, or 0 when the
+ * cell is untouched or fully dug. A level-4 day goes through every stage; a level-1 day opens in one scrape.
+ */
+const crumbleStage = (initial, remaining) => remaining <= 0 || remaining >= initial ? 0 : Math.ceil(((initial - remaining) / initial) * CRUMBLE_STAGES - 1e-9);
 const toX = (x) => x * (_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE);
 const toY = (y) => y * (_core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_HEADER_HEIGHT;
-const centerOf = ({ x, y }) => `${toX(x) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE / 2} ${toY(y) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE / 2}`;
+const centerX = (x) => toX(x) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE / 2;
+const centerY = (y) => toY(y) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.CELL_SIZE / 2;
+const centerOf = ({ x, y }) => `${centerX(x)} ${centerY(y)}`;
 const SVG_KEY_TIMES_PRECISION = 4;
 const toKeyTime = (index, totalFrames) => Number((index / (totalFrames - 1)).toFixed(SVG_KEY_TIMES_PRECISION));
-/** Discrete animation that only lists the frames where the value changes. */
+/**
+ * Discrete animation that only lists the frames where the value changes. A discrete animation holds each
+ * value until the next keyframe, so no hold keyframes or closing keyframe at 1 are needed.
+ */
 const generateChangingValuesAnimation = (changingValues) => {
     const totalFrames = changingValues.length;
     if (totalFrames <= 1)
         return null;
     const keyTimes = [];
     const values = [];
-    let lastValue = null;
-    let lastIndex = null;
-    changingValues.forEach((currentValue, index) => {
-        if (currentValue === lastValue)
+    changingValues.forEach((value, index) => {
+        if (value === values[values.length - 1])
             return;
-        if (lastValue !== null && lastIndex !== null && index - 1 !== lastIndex) {
-            keyTimes.push(Number(((index - 0.1) / (totalFrames - 1)).toFixed(SVG_KEY_TIMES_PRECISION)));
-            values.push(lastValue);
+        const time = toKeyTime(index, totalFrames);
+        // Two changes that round to the same key time: the later one wins.
+        if (time === keyTimes[keyTimes.length - 1])
+            values[values.length - 1] = value;
+        else {
+            keyTimes.push(time);
+            values.push(value);
         }
-        keyTimes.push(toKeyTime(index, totalFrames));
-        values.push(currentValue);
-        lastValue = currentValue;
-        lastIndex = index;
     });
     if (values.length <= 1)
         return null;
-    if (keyTimes[keyTimes.length - 1] !== 1) {
-        keyTimes.push(1);
-        values.push(lastValue !== null && lastValue !== void 0 ? lastValue : changingValues[totalFrames - 1]);
-    }
     return { keyTimes: keyTimes.join(';'), values: values.join(';') };
 };
 /**
@@ -4642,56 +4647,30 @@ const buildMonthLabels = (store) => {
     }
     return labels;
 };
-/** At most this many half-dug cells crumble at once; the wombat digs one at a time, so one spare is plenty. */
-const CRUMBLE_SLOTS = 2;
+/** How high above the ground a note floats on its way to the beetle. */
+const NOTE_LIFT = 8;
 /**
- * Crumble overlays for every frame, one timeline per slot. A cell keeps the same slot for as long as it is
- * half-dug, so its overlay never jumps between slots mid-crumble.
+ * While the wombat hums, a note floats from it to the beetle it is singing to, bobbing as it goes, and
+ * lands on the frame the beetle gets sleepier.
  */
-const buildCrumbleTimelines = (store) => {
-    var _a, _b;
-    const slots = Array.from({ length: CRUMBLE_SLOTS }, () => []);
-    let assigned = Array(CRUMBLE_SLOTS).fill(null);
-    for (const snapshot of store.snapshots) {
-        const crumbling = new Map();
-        for (let x = 0; x < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_WIDTH; x++) {
-            for (let y = 0; y < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT; y++) {
-                const stage = (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.crumbleStage)((_b = (_a = store.initialSoil[x]) === null || _a === void 0 ? void 0 : _a[y]) !== null && _b !== void 0 ? _b : 0, snapshot.soil[x][y]);
-                if (stage > 0)
-                    crumbling.set(`${x}:${y}`, { position: { x, y }, stage });
-            }
-        }
-        assigned = assigned.map((key) => (key !== null && crumbling.has(key) ? key : null));
-        for (const key of crumbling.keys()) {
-            if (assigned.includes(key))
-                continue;
-            const free = assigned.indexOf(null);
-            if (free >= 0)
-                assigned[free] = key;
-        }
-        assigned.forEach((key, slot) => slots[slot].push(key === null ? null : crumbling.get(key)));
-    }
-    return slots.map((frames) => {
-        var _a;
-        // An idle slot stays where it last was (hidden) so it never slides across the board.
-        let last = (_a = frames.find((f) => f !== null)) !== null && _a !== void 0 ? _a : { position: { x: 0, y: 0 }, stage: 1 };
-        const filled = frames.map((f) => (f ? (last = f) : last));
-        return {
-            positions: filled.map((f) => centerOf(f.position)),
-            refs: filled.map((f) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.crumbleRef)(f.stage)),
-            opacities: frames.map((f) => (f ? '1' : '0'))
-        };
-    });
-};
-/** The lantern glow follows the wombat and only shows while the lantern is up. */
-const buildLanternGlowTimeline = (store) => {
+const buildNoteTimeline = (store) => {
     var _a;
-    const refs = store.snapshots.map((s) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.lanternGlowRef)(s.wombat));
-    let last = (_a = refs.find((r) => r !== null)) !== null && _a !== void 0 ? _a : '#bg-side-r';
+    const frames = store.snapshots.map((s) => {
+        const { wombat } = s;
+        const beetle = s.beetles.find((b) => b.id === wombat.humTarget);
+        if (wombat.pose !== 'hum' || !beetle)
+            return null;
+        const progress = (_core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_HUM_FRAMES - wombat.humHold) / _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_HUM_FRAMES;
+        const x = centerX(wombat.x) + (centerX(beetle.x) - centerX(wombat.x)) * progress;
+        const y = centerY(wombat.y) + (centerY(beetle.y) - centerY(wombat.y)) * progress - NOTE_LIFT - (wombat.humHold % 2) * 2;
+        return { position: `${Math.round(x * 10) / 10} ${Math.round(y * 10) / 10}`, ref: (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.noteRef)(wombat.humHold) };
+    });
+    let last = (_a = frames.find((f) => f !== null)) !== null && _a !== void 0 ? _a : { position: '0 0', ref: (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.noteRef)(0) };
+    const filled = frames.map((f) => (f ? (last = f) : last));
     return {
-        positions: store.snapshots.map((s) => centerOf(s.wombat)),
-        refs: refs.map((r) => (r ? (last = r) : last)),
-        opacities: refs.map((r) => (r ? '1' : '0'))
+        positions: filled.map((f) => f.position),
+        refs: filled.map((f) => f.ref),
+        opacities: frames.map((f) => (f ? '1' : '0'))
     };
 };
 const isInSoil = (snapshot, { x, y }) => { var _a, _b; return ((_b = (_a = snapshot.soil[x]) === null || _a === void 0 ? void 0 : _a[y]) !== null && _b !== void 0 ? _b : 0) > 0; };
@@ -4703,28 +4682,42 @@ const generateAnimatedSVG = (store) => {
     const totalFrames = Math.max(store.snapshots.length, 1);
     const durationMs = Math.round(Math.max((totalFrames * _core_constants__WEBPACK_IMPORTED_MODULE_1__.DELTA_TIME) / _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_DURATION_DIVISOR, _core_constants__WEBPACK_IMPORTED_MODULE_1__.BURROW_MIN_DURATION_MS));
     const snapshots = store.snapshots;
-    const soilColor = (hardness) => (hardness > 0 ? theme.intensityColors[hardness] : palette.tunnel);
+    // Tunnel cells are left transparent so the textured tunnel floor shows through underneath.
+    const soilColor = (hardness) => (hardness > 0 ? theme.intensityColors[hardness] : 'transparent');
+    const animate = (attributeName, anim) => anim
+        ? `<animate attributeName="${attributeName}" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`
+        : '';
     let cells = '';
     for (let x = 0; x < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_WIDTH; x++) {
         for (let y = 0; y < _core_constants__WEBPACK_IMPORTED_MODULE_1__.GRID_HEIGHT; y++) {
             const fills = snapshots.map((s) => soilColor(s.soil[x][y]));
-            const anim = generateChangingValuesAnimation(fills);
-            // Cells cover the gaps too: the soil is one continuous field, softened by the blur below.
-            cells += `<rect x="${toX(x)}" y="${toY(y)}" width="${PITCH}" height="${PITCH}" fill="${fills[0]}">`;
-            if (anim) {
-                cells += `<animate attributeName="fill" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${anim.keyTimes}" values="${anim.values}"/>`;
+            if (fills.every((f) => f === 'transparent'))
+                continue;
+            // Cells are drawn edge to edge (no gaps) and shrink a step with each scrape while they are being dug.
+            // Once a cell is dug out it is transparent, so it keeps its last size until the soil regrows; that
+            // saves a keyframe per cell.
+            let scale = CRUMBLE_SCALES[0];
+            const scales = snapshots.map((s) => {
+                var _a, _b;
+                if (s.soil[x][y] > 0)
+                    scale = CRUMBLE_SCALES[crumbleStage((_b = (_a = store.initialSoil[x]) === null || _a === void 0 ? void 0 : _a[y]) !== null && _b !== void 0 ? _b : 0, s.soil[x][y])];
+                return scale;
+            });
+            const scaleAnim = generateChangingValuesAnimation(scales);
+            cells += `<rect x="${-PITCH / 2}" y="${-PITCH / 2}" width="${PITCH}" height="${PITCH}" fill="${fills[0]}" transform="translate(${centerX(x) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE / 2} ${centerY(y) + _core_constants__WEBPACK_IMPORTED_MODULE_1__.GAP_SIZE / 2})">`;
+            cells += animate('fill', generateChangingValuesAnimation(fills));
+            if (scaleAnim) {
+                cells += `<animateTransform attributeName="transform" type="scale" additive="sum" calcMode="discrete" dur="${durationMs}ms" repeatCount="indefinite" keyTimes="${scaleAnim.keyTimes}" values="${scaleAnim.values}"/>`;
             }
             cells += `</rect>`;
         }
     }
     const timelines = [
-        ...buildCrumbleTimelines(store),
         ...store.pebbles.map((_, i) => ({
             positions: snapshots.map((s) => centerOf(s.pebbles[i])),
             refs: snapshots.map((s) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.pebbleRef)(s.pebbles[i])),
             opacities: snapshots.map((s) => (s.pebbles[i].state === 'gone' ? '0' : '1'))
         })),
-        buildLanternGlowTimeline(store),
         ...store.beetles.map((_, i) => ({
             positions: snapshots.map((s) => centerOf(s.beetles[i])),
             refs: snapshots.map((s) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.beetleRef)(s.beetles[i])),
@@ -4740,9 +4733,10 @@ const generateAnimatedSVG = (store) => {
             positions: snapshots.map((s) => centerOf(s.wombat)),
             refs: snapshots.map((s) => (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.wombatRef)(s.wombat)),
             opacities: snapshots.map((s) => (s.wombat.visible ? '1' : '0'))
-        }
+        },
+        buildNoteTimeline(store)
     ];
-    // Sprites that never show (an unused crumble slot, say) are neither drawn nor defined.
+    // Sprites that never show (the notes, on a graph with no beetles in reach) are neither drawn nor defined.
     const visible = timelines.filter((t) => t.opacities.some((o) => o !== '0'));
     const usedRefs = new Set(visible.flatMap((t) => t.refs));
     let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" color-interpolation="sRGB">`;
@@ -4750,7 +4744,8 @@ const generateAnimatedSVG = (store) => {
     svg += (0,_sprites__WEBPACK_IMPORTED_MODULE_2__.buildSpriteDefs)(palette, usedRefs).replace('<defs>', `<defs>${buildSoilDefs(width)}`);
     svg += `<rect width="100%" height="100%" fill="${theme.gridBackground}"/>`;
     svg += buildMonthLabels(store);
-    svg += `<g filter="url(#burrow-soil)" clip-path="url(#burrow-field)">${cells}</g>`;
+    svg += `<g clip-path="url(#burrow-field)"><rect x="0" y="${FIELD_TOP}" width="${width}" height="${FIELD_HEIGHT}" fill="${palette.tunnel}"/>`;
+    svg += `<g filter="url(#burrow-soil)">${cells}</g></g>`;
     svg += visible.map((t) => renderSprite(t, durationMs)).join('');
     svg += `</svg>`;
     return svg;
